@@ -1,351 +1,188 @@
+<!DOCTYPE html>
 <html lang="fr" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ARRIVA — Alerte d'Arrivée GPS Intelligente</title>
 <meta name="theme-color" content="#070b18">
-<meta name="description" content="ARRIVA — utilitaire de transport 100% front-end : alerte sonore et visuelle à l'approche de votre arrêt (GPS + carte interactive).">
+<meta name="description" content="ARRIVA — utilitaire de transport 100% front-end : alerte sonore et visuelle à l'approche de votre arrêt (GPS + carte Google Maps Voyager + Unity Ads).">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-          display: ['Space Grotesk', 'sans-serif'],
-          mono: ['JetBrains Mono', 'monospace']
-        },
-        colors: {
-          ink: '#070b18',
-          panel: '#0d132a',
-          accent: '#6366f1',
-          neon: '#22d3ee',
-          alert: '#ff2d55',
-          lime: '#a3e635'
-        },
-        boxShadow: {
-          glow: '0 0 40px rgba(99,102,241,0.35)',
-          alertGlow: '0 0 60px rgba(255,45,85,0.5)'
-        }
-      }
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Space Grotesk"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace']
+      },
+      colors: { ink: '#070b18', panel: '#0d132a', accent: '#6366f1', neon: '#22d3ee', alert: '#ff2d55', lime: '#a3e635' },
+      boxShadow: { glow: '0 0 40px rgba(99,102,241,0.35)', alertGlow: '0 0 60px rgba(255,45,85,0.5)' }
     }
   }
+};
 </script>
 <style>
-  :root{
-    --bg:#070b18;
-    --panel:rgba(13,19,42,.86);
-    --panel-solid:#0d132a;
-    --chip:rgba(255,255,255,.07);
-    --text:#eef2f8;
-    --dim:#93a0b8;
-    --border:rgba(255,255,255,.12);
-  }
-  html[data-theme="light"]{
-    --bg:#e9edf5;
-    --panel:rgba(255,255,255,.93);
-    --panel-solid:#ffffff;
-    --chip:rgba(15,23,42,.05);
-    --text:#0f172a;
-    --dim:#5b6780;
-    --border:rgba(15,23,42,.12);
-  }
-  *{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
-  html,body{ height:100%; overscroll-behavior:none; }
-  body{
-    margin:0;
-    font-family:'Plus Jakarta Sans',system-ui,sans-serif;
-    background:var(--bg);
-    color:var(--text);
-    overflow:hidden;
-  }
-  #map{ position:absolute; inset:0; z-index:0; background:var(--bg); }
-  .leaflet-container{ font-family:'Plus Jakarta Sans',sans-serif; }
-  html[data-theme="dark"] .leaflet-container{ background:#070b18; }
-  html[data-theme="light"] .leaflet-container{ background:#dfe5ee; }
-  .leaflet-control-attribution{
-    font-size:9px !important; background:rgba(0,0,0,.45) !important; color:#94a3b8 !important;
-    backdrop-filter:blur(8px); border-radius:8px 0 0 0; padding:1px 6px !important;
-  }
-  .leaflet-control-attribution a{ color:#cbd5e1 !important; }
-  .leaflet-control-zoom{ display:none !important; }
-
-  .glass{
-    background:var(--panel);
-    backdrop-filter:blur(22px) saturate(1.5);
-    -webkit-backdrop-filter:blur(22px) saturate(1.5);
-    border:1px solid var(--border);
-  }
-  .glass-strong{ background:var(--panel-solid); border:1px solid var(--border); }
-  .chip{ background:var(--chip); border:1px solid var(--border); color:var(--text); }
-  .text-dim{ color:var(--dim) !important; }
-
-  /* ---------- Marqueur utilisateur ---------- */
-  .user-wrap{ position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
-  .user-radar{
-    position:absolute; inset:-22px; border-radius:50%;
-    background:conic-gradient(from 0deg, rgba(34,211,238,.5), transparent 75deg, transparent);
-    animation:spin 2.6s linear infinite;
-  }
-  .user-pulse-ring{
-    position:absolute; inset:-10px; border-radius:50%;
-    border:2px solid rgba(34,211,238,.6); animation:ringPulse 2s ease-out infinite;
-  }
-  .user-dot{
-    width:18px; height:18px; border-radius:50%; position:relative; z-index:2;
-    background:linear-gradient(135deg,#22d3ee,#6366f1);
-    border:3px solid #fff;
-    box-shadow:0 0 20px rgba(34,211,238,.8), 0 2px 10px rgba(0,0,0,.5);
-  }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  @keyframes ringPulse{ 0%{ transform:scale(.55); opacity:1; } 100%{ transform:scale(1.45); opacity:0; } }
-
-  /* ---------- Marqueur destination ---------- */
-  .dest-pin-wrap{ filter:drop-shadow(0 10px 18px rgba(255,45,85,.45)); animation:pinDrop .55s cubic-bezier(.34,1.56,.64,1); }
-  .dest-pin{ width:44px; height:52px; }
-  .dest-pin svg{ width:100%; height:100%; }
-  .pin-bounce{ animation:pinBounce 2.2s ease-in-out infinite; transform-origin:bottom center; }
-  @keyframes pinDrop{ 0%{ transform:translateY(-70px) scale(.5); opacity:0; } 100%{ transform:translateY(0) scale(1); opacity:1; } }
-  @keyframes pinBounce{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
-
-  /* ---------- Bottom sheet ---------- */
-  #bottomSheet{
-    transition:transform .45s cubic-bezier(.32,.72,.24,1), max-height .45s ease;
-    max-height:82vh;
-  }
-  #bottomSheet.collapsed{ transform:translateY(calc(100% - 86px)); }
-  @media (min-width:768px){
-    #bottomSheet{ transform:none !important; max-height:none !important; }
-    #bottomSheet.collapsed{ transform:none !important; }
-  }
-  .sheet-scroll{ overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(99,102,241,.4) transparent; }
-  .sheet-scroll::-webkit-scrollbar{ width:4px; }
-  .sheet-scroll::-webkit-scrollbar-thumb{ background:rgba(99,102,241,.4); border-radius:99px; }
-
-  /* ---------- Sliders ---------- */
-  input[type=range]{
-    -webkit-appearance:none; appearance:none; width:100%; height:8px; border-radius:99px;
-    background:linear-gradient(90deg,#6366f1,#22d3ee,#a3e635); outline:none;
-  }
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none; width:26px; height:26px; border-radius:50%;
-    background:#fff; border:4px solid #6366f1;
-    box-shadow:0 4px 16px rgba(99,102,241,.6); cursor:pointer; transition:transform .15s;
-  }
-  input[type=range]::-webkit-slider-thumb:active{ transform:scale(1.18); }
-  input[type=range]::-moz-range-thumb{
-    width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid #6366f1; cursor:pointer;
-  }
-  input[type=range].sm::-webkit-slider-thumb{ width:20px; height:20px; border-width:3px; }
-
-  /* ---------- Overlay alarme ---------- */
-  #alarmOverlay{ display:none; }
-  #alarmOverlay.active{ display:flex; }
-  .alarm-bg{
-    position:absolute; inset:0;
-    background:radial-gradient(circle at 50% 28%, #ff2d55 0%, #9f1239 45%, #0a0f1e 100%);
-    animation:alarmFlash 1s ease-in-out infinite;
-  }
-  @keyframes alarmFlash{
-    0%,100%{ opacity:1; filter:brightness(1); }
-    50%{ opacity:.86; filter:brightness(1.35); }
-  }
-  .alarm-ring{ animation:alarmShake .6s ease-in-out infinite; }
-  @keyframes alarmShake{
-    0%,100%{ transform:rotate(-8deg) scale(1); }
-    25%{ transform:rotate(8deg) scale(1.08); }
-    50%{ transform:rotate(-8deg) scale(1); }
-    75%{ transform:rotate(8deg) scale(1.08); }
-  }
-  .flash-bar{ animation:flashSlide 1.2s linear infinite; }
-  @keyframes flashSlide{ 0%{ transform:translateX(-100%); } 100%{ transform:translateX(200%); } }
-  .strobe{
-    position:absolute; inset:0; pointer-events:none; border:6px solid #fff; opacity:0;
-    animation:strobe .8s step-end infinite;
-  }
-  @keyframes strobe{ 0%,49%{ opacity:0; } 50%,100%{ opacity:.9; } }
-
-  /* ---------- Boutons ---------- */
-  .btn-primary{
-    background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);
-    box-shadow:0 8px 30px rgba(99,102,241,.5), inset 0 1px 0 rgba(255,255,255,.3);
-    transition:transform .18s, opacity .18s; position:relative; overflow:hidden;
-  }
-  .btn-primary::after{
-    content:''; position:absolute; top:0; left:-120%; width:55%; height:100%;
-    background:linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent);
-    transform:skewX(-20deg); animation:shine 3.2s infinite;
-  }
-  @keyframes shine{ 0%{ left:-120%; } 55%,100%{ left:220%; } }
-  .btn-primary:active{ transform:scale(.98); }
-  .btn-primary:disabled{ opacity:.4; filter:grayscale(1); box-shadow:none; cursor:not-allowed; }
-  .btn-primary:disabled::after{ display:none; }
-  .btn-alert{ background:#fff; color:#be123c; box-shadow:0 12px 40px rgba(0,0,0,.4); }
-
-  .radius-pill{ transition:all .2s; cursor:pointer; }
-  .radius-pill.active{
-    background:linear-gradient(135deg,#6366f1,#22d3ee); color:#fff; border-color:transparent;
-    box-shadow:0 4px 20px rgba(99,102,241,.5); transform:scale(1.04);
-  }
-  .alarm-type{ transition:all .2s; cursor:pointer; }
-  .alarm-type.active{
-    border-color:#6366f1 !important; background:rgba(99,102,241,.15) !important;
-    box-shadow:0 0 0 2px rgba(99,102,241,.4);
-  }
-
-  /* ---------- Toggle ---------- */
-  .toggle{
-    width:48px; height:28px; border-radius:99px; position:relative; cursor:pointer; flex-shrink:0;
-    background:rgba(148,163,184,.3); transition:background .25s;
-  }
-  .toggle::after{
-    content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%;
-    background:#fff; transition:left .25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 2px 8px rgba(0,0,0,.3);
-  }
-  .toggle.on{ background:linear-gradient(90deg,#22d3ee,#6366f1); }
-  .toggle.on::after{ left:23px; }
-
-  .live-dot{
-    width:10px; height:10px; border-radius:50%; background:#22c55e;
-    box-shadow:0 0 0 0 rgba(34,197,94,.7); animation:livePulse 1.6s infinite;
-  }
-  @keyframes livePulse{ 70%{ box-shadow:0 0 0 10px rgba(34,197,94,0); } 100%{ box-shadow:0 0 0 0 rgba(34,197,94,0); } }
-
-  #compassArrow, #panelArrow{ transition:transform .6s cubic-bezier(.34,1.3,.64,1); }
-
-  /* ---------- Recherche ---------- */
-  #searchResults{ max-height:260px; overflow-y:auto; }
-  .search-item{ transition:background .15s; }
-  .search-item:hover, .search-item:active{ background:rgba(99,102,241,.15); }
-
-  /* ---------- Toasts ---------- */
-  .toast{ animation:toastIn .4s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes toastIn{ from{ transform:translateY(18px) scale(.92); opacity:0; } to{ transform:translateY(0) scale(1); opacity:1; } }
-  .toast.out{ animation:toastOut .3s ease forwards; }
-  @keyframes toastOut{ to{ transform:translateY(16px); opacity:0; } }
-
-  /* ---------- Divers ---------- */
-  #trackingProgress{ transition:width .8s ease, background .3s; }
-  .eq{ display:flex; gap:3px; align-items:flex-end; height:16px; }
-  .eq span{ width:4px; background:#22d3ee; border-radius:99px; animation:eq .8s ease-in-out infinite; }
-  .eq span:nth-child(2){ animation-delay:.15s; background:#6366f1; }
-  .eq span:nth-child(3){ animation-delay:.3s; background:#d946ef; }
-  @keyframes eq{ 0%,100%{ height:5px; } 50%{ height:16px; } }
-
-  .safe-bottom{ padding-bottom:max(env(safe-area-inset-bottom,0px), 12px); }
-  .leaflet-marker-icon{ background:transparent !important; border:none !important; }
-
-  /* ---------- Code modal ---------- */
-  #codeModal{ display:none; }
-  #codeModal.open{ display:flex; }
-  .code-tab{ transition:all .2s; }
-  .code-tab.active{ background:rgba(99,102,241,.22); color:#fff; border-color:rgba(99,102,241,.55); }
-  html[data-theme="light"] .code-tab.active{ color:#4338ca; }
-  pre.code{
-    font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.7; tab-size:2;
-    margin:0; white-space:pre-wrap; word-break:break-word;
-  }
-  .code-keyword{ color:#c084fc; font-weight:600; }
-  .code-string{ color:#86efac; }
-  .code-comment{ color:#64748b; font-style:italic; }
-  .code-func{ color:#67e8f9; }
-  .code-num{ color:#fbbf24; }
-
-  /* ---------- Onboarding ---------- */
-  #onboarding{ display:none; }
-  #onboarding.open{ display:flex; }
-  .slide{ display:none; }
-  .slide.active{ display:block; animation:toastIn .5s ease; }
-
-  /* ---------- Publicité interstitielle ---------- */
-  #adOverlay{ display:none; }
-  #adOverlay.active{ display:flex; }
-  #adCard{ animation:adIn .45s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes adIn{ from{ transform:translateY(26px) scale(.94); opacity:0; } to{ transform:translateY(0) scale(1); opacity:1; } }
-  #adOverlay.closing #adCard{ animation:adOut .3s ease forwards; }
-  @keyframes adOut{ to{ transform:translateY(22px) scale(.96); opacity:0; } }
-  #adProgress{ transition:width linear; }
-  .ad-pulse{ animation:adPulse 1.6s ease-in-out infinite; }
-  @keyframes adPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
-  .ad-shine{
-    position:absolute; inset:0; transform:translateX(-120%);
-    background:linear-gradient(115deg, transparent 30%, rgba(255,255,255,.28) 50%, transparent 70%);
-    animation:adShine 2.8s ease-in-out infinite;
-  }
-  @keyframes adShine{ 0%{ transform:translateX(-120%); } 60%,100%{ transform:translateX(120%); } }
-
-  @media (prefers-reduced-motion: reduce){
-    *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.05ms !important; }
-  }
+:root{ --bg:#070b18; --panel:rgba(13,19,42,.86); --panel-solid:#0d132a; --chip:rgba(255,255,255,.07); --text:#eef2f8; --dim:#93a0b8; --border:rgba(255,255,255,.12); }
+html[data-theme="light"]{ --bg:#e9edf5; --panel:rgba(255,255,255,.93); --panel-solid:#ffffff; --chip:rgba(15,23,42,.05); --text:#0f172a; --dim:#5b6780; --border:rgba(15,23,42,.12); }
+*{ -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
+html,body{ height:100%; overscroll-behavior:none; }
+body{ margin:0; font-family:'Plus Jakarta Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); overflow:hidden; }
+#map{ position:absolute; inset:0; z-index:0; background:#e8eef7; }
+.leaflet-container{ font-family:'Plus Jakarta Sans',sans-serif; }
+html[data-theme="dark"] .leaflet-container{ background:#e8eef7; }
+.leaflet-control-attribution{ font-size:9px !important; background:rgba(255,255,255,.92) !important; color:#475569 !important; backdrop-filter:blur(8px); border-radius:8px 0 0 0; padding:2px 7px !important; border:1px solid rgba(0,0,0,.08); }
+.leaflet-control-attribution a{ color:#334155 !important; }
+.leaflet-control-zoom{ display:none !important; }
+.glass{ background:var(--panel); backdrop-filter:blur(22px) saturate(1.5); -webkit-backdrop-filter:blur(22px) saturate(1.5); border:1px solid var(--border); }
+.glass-strong{ background:var(--panel-solid); border:1px solid var(--border); }
+.chip{ background:var(--chip); border:1px solid var(--border); color:var(--text); }
+.text-dim{ color:var(--dim) !important; }
+.user-wrap{ position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+.user-radar{ position:absolute; inset:-22px; border-radius:50%; background:conic-gradient(from 0deg, rgba(34,211,238,.5), transparent 75deg, transparent); animation:spin 2.6s linear infinite; }
+.user-pulse-ring{ position:absolute; inset:-10px; border-radius:50%; border:2px solid rgba(34,211,238,.6); animation:ringPulse 2s ease-out infinite; }
+.user-dot{ width:18px; height:18px; border-radius:50%; position:relative; z-index:2; background:linear-gradient(135deg,#22d3ee,#6366f1); border:3px solid #fff; box-shadow:0 0 20px rgba(34,211,238,.8), 0 2px 10px rgba(0,0,0,.5); }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+@keyframes ringPulse{ 0%{ transform:scale(.55); opacity:1; } 100%{ transform:scale(1.45); opacity:0; } }
+.dest-pin-wrap{ filter:drop-shadow(0 10px 18px rgba(255,45,85,.45)); animation:pinDrop .55s cubic-bezier(.34,1.56,.64,1); }
+.dest-pin{ width:44px; height:52px; }
+.dest-pin svg{ width:100%; height:100%; }
+.pin-bounce{ animation:pinBounce 2.2s ease-in-out infinite; transform-origin:bottom center; }
+@keyframes pinDrop{ 0%{ transform:translateY(-70px) scale(.5); opacity:0; } 100%{ transform:translateY(0) scale(1); opacity:1; } }
+@keyframes pinBounce{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+#bottomSheet{ transition:transform .45s cubic-bezier(.32,.72,.24,1), max-height .45s ease; max-height:82vh; }
+#bottomSheet.collapsed{ transform:translateY(calc(100% - 86px)); }
+@media (min-width:768px){ #bottomSheet{ transform:none !important; max-height:none !important; } #bottomSheet.collapsed{ transform:none !important; } }
+.sheet-scroll{ overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(99,102,241,.4) transparent; }
+.sheet-scroll::-webkit-scrollbar{ width:4px; }
+.sheet-scroll::-webkit-scrollbar-thumb{ background:rgba(99,102,241,.4); border-radius:99px; }
+input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:8px; border-radius:99px; background:linear-gradient(90deg,#6366f1,#22d3ee,#a3e635); outline:none; }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid #6366f1; box-shadow:0 4px 16px rgba(99,102,241,.6); cursor:pointer; transition:transform .15s; }
+input[type=range]::-webkit-slider-thumb:active{ transform:scale(1.18); }
+input[type=range]::-moz-range-thumb{ width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid #6366f1; cursor:pointer; }
+input[type=range].sm::-webkit-slider-thumb{ width:20px; height:20px; border-width:3px; }
+#alarmOverlay{ display:none; }
+#alarmOverlay.active{ display:flex; }
+.alarm-bg{ position:absolute; inset:0; background:radial-gradient(circle at 50% 28%, #ff2d55 0%, #9f1239 45%, #0a0f1e 100%); animation:alarmFlash 1s ease-in-out infinite; }
+@keyframes alarmFlash{ 0%,100%{ opacity:1; filter:brightness(1); } 50%{ opacity:.86; filter:brightness(1.35); } }
+.alarm-ring{ animation:alarmShake .6s ease-in-out infinite; }
+@keyframes alarmShake{ 0%,100%{ transform:rotate(-8deg) scale(1); } 25%{ transform:rotate(8deg) scale(1.08); } 50%{ transform:rotate(-8deg) scale(1); } 75%{ transform:rotate(8deg) scale(1.08); } }
+.flash-bar{ animation:flashSlide 1.2s linear infinite; }
+@keyframes flashSlide{ 0%{ transform:translateX(-100%); } 100%{ transform:translateX(200%); } }
+.strobe{ position:absolute; inset:0; pointer-events:none; border:6px solid #fff; opacity:0; animation:strobe .8s step-end infinite; }
+@keyframes strobe{ 0%,49%{ opacity:0; } 50%,100%{ opacity:.9; } }
+.btn-primary{ background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%); box-shadow:0 8px 30px rgba(99,102,241,.5), inset 0 1px 0 rgba(255,255,255,.3); transition:transform .18s, opacity .18s; position:relative; overflow:hidden; }
+.btn-primary::after{ content:''; position:absolute; top:0; left:-120%; width:55%; height:100%; background:linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent); transform:skewX(-20deg); animation:shine 3.2s infinite; }
+@keyframes shine{ 0%{ left:-120%; } 55%,100%{ left:220%; } }
+.btn-primary:active{ transform:scale(.98); }
+.btn-primary:disabled{ opacity:.4; filter:grayscale(1); box-shadow:none; cursor:not-allowed; }
+.btn-primary:disabled::after{ display:none; }
+.btn-alert{ background:#fff; color:#be123c; box-shadow:0 12px 40px rgba(0,0,0,.4); }
+.radius-pill{ transition:all .2s; cursor:pointer; }
+.radius-pill.active{ background:linear-gradient(135deg,#6366f1,#22d3ee); color:#fff; border-color:transparent; box-shadow:0 4px 20px rgba(99,102,241,.5); transform:scale(1.04); }
+.alarm-type{ transition:all .2s; cursor:pointer; }
+.alarm-type.active{ border-color:#6366f1 !important; background:rgba(99,102,241,.15) !important; box-shadow:0 0 0 2px rgba(99,102,241,.4); }
+.toggle{ width:48px; height:28px; border-radius:99px; position:relative; cursor:pointer; flex-shrink:0; background:rgba(148,163,184,.3); transition:background .25s; }
+.toggle::after{ content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:left .25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 2px 8px rgba(0,0,0,.3); }
+.toggle.on{ background:linear-gradient(90deg,#22d3ee,#6366f1); }
+.toggle.on::after{ left:23px; }
+.live-dot{ width:10px; height:10px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 0 rgba(34,197,94,.7); animation:livePulse 1.6s infinite; }
+@keyframes livePulse{ 70%{ box-shadow:0 0 0 10px rgba(34,197,94,0); } 100%{ box-shadow:0 0 0 0 rgba(34,197,94,0); } }
+#compassArrow, #panelArrow{ transition:transform .6s cubic-bezier(.34,1.3,.64,1); }
+#searchResults{ max-height:260px; overflow-y:auto; }
+.search-item{ transition:background .15s; }
+.search-item:hover, .search-item:active{ background:rgba(99,102,241,.15); }
+.toast{ animation:toastIn .4s cubic-bezier(.34,1.56,.64,1); }
+@keyframes toastIn{ from{ transform:translateY(18px) scale(.92); opacity:0; } to{ transform:translateY(0) scale(1); opacity:1; } }
+.toast.out{ animation:toastOut .3s ease forwards; }
+@keyframes toastOut{ to{ transform:translateY(16px); opacity:0; } }
+#trackingProgress{ transition:width .8s ease, background .3s; }
+.eq{ display:flex; gap:3px; align-items:flex-end; height:16px; }
+.eq span{ width:4px; background:#22d3ee; border-radius:99px; animation:eq .8s ease-in-out infinite; }
+.eq span:nth-child(2){ animation-delay:.15s; background:#6366f1; }
+.eq span:nth-child(3){ animation-delay:.3s; background:#d946ef; }
+@keyframes eq{ 0%,100%{ height:5px; } 50%{ height:16px; } }
+.safe-bottom{ padding-bottom:max(env(safe-area-inset-bottom,0px), 12px); }
+.leaflet-marker-icon{ background:transparent !important; border:none !important; }
+#codeModal{ display:none; }
+#codeModal.open{ display:flex; }
+.code-tab{ transition:all .2s; }
+.code-tab.active{ background:rgba(99,102,241,.22); color:#fff; border-color:rgba(99,102,241,.55); }
+html[data-theme="light"] .code-tab.active{ color:#4338ca; }
+pre.code{ font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.7; tab-size:2; margin:0; white-space:pre-wrap; word-break:break-word; }
+.code-keyword{ color:#c084fc; font-weight:600; }
+.code-string{ color:#86efac; }
+.code-comment{ color:#64748b; font-style:italic; }
+.code-func{ color:#67e8f9; }
+.code-num{ color:#fbbf24; }
+#onboarding{ display:none; }
+#onboarding.open{ display:flex; }
+.slide{ display:none; }
+.slide.active{ display:block; animation:toastIn .5s ease; }
+#adOverlay{ display:none; }
+#adOverlay.active{ display:flex; }
+#adCard{ animation:adIn .45s cubic-bezier(.34,1.56,.64,1); }
+@keyframes adIn{ from{ transform:translateY(26px) scale(.94); opacity:0; } to{ transform:translateY(0) scale(1); opacity:1; } }
+#adOverlay.closing #adCard{ animation:adOut .3s ease forwards; }
+@keyframes adOut{ to{ transform:translateY(22px) scale(.96); opacity:0; } }
+#adProgress{ transition:width linear; }
+.ad-pulse{ animation:adPulse 1.6s ease-in-out infinite; }
+@keyframes adPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+.ad-shine{ position:absolute; inset:0; transform:translateX(-120%); background:linear-gradient(115deg, transparent 30%, rgba(255,255,255,.28) 50%, transparent 70%); animation:adShine 2.8s ease-in-out infinite; }
+@keyframes adShine{ 0%{ transform:translateX(-120%); } 60%,100%{ transform:translateX(120%); } }
+#bannerAd{ display:none; }
+#bannerAd.active{ display:flex; }
+@keyframes bannerIn{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+#bannerAd.active > div{ animation:bannerIn .4s cubic-bezier(.32,.72,.24,1); }
+@media (prefers-reduced-motion: reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.05ms !important; } }
 </style>
 </head>
 <body>
+<div id="map" aria-label="Carte interactive Google Maps Voyager"></div>
 
-<!-- ================= CARTE LEAFLET PLEIN ÉCRAN ================= -->
-<div id="map" aria-label="Carte interactive"></div>
-
-<!-- ================= HEADER + RECHERCHE ================= -->
 <header class="absolute top-0 inset-x-0 z-[1000] p-3 md:p-4 pointer-events-none">
   <div class="w-full max-w-md mx-auto md:mx-0 md:max-w-[420px] pointer-events-auto">
-
     <div class="flex items-center gap-2 mb-2">
       <div class="glass rounded-2xl px-3 py-2 flex items-center gap-2.5 shadow-lg">
         <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-glow">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>
-          </svg>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
         </div>
         <div class="leading-none">
           <div class="font-display font-bold text-[15px] tracking-tight">ARRIVA</div>
           <div class="text-[9.5px] text-dim font-bold tracking-[.18em] uppercase mt-0.5">Alerte GPS Réveil</div>
         </div>
       </div>
-
       <div class="ml-auto flex gap-2">
-        <button id="themeBtn" title="Basculer le thème" aria-label="Basculer le thème"
-          class="glass w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition hover:bg-white/10">
-          <svg id="iconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
-          </svg>
-          <svg id="iconSun" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
-          </svg>
+        <button id="themeBtn" title="Basculer le thème" aria-label="Basculer le thème" class="glass w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition hover:bg-white/10">
+          <svg id="iconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg id="iconSun" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
         </button>
-        <button id="codeBtn" title="Voir le code source React / Vite" aria-label="Voir le code source"
-          class="glass h-10 px-3 rounded-xl flex items-center gap-2 active:scale-95 transition text-[13px] font-bold hover:bg-white/10">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>
-          </svg>
+        <button id="codeBtn" title="Voir le code source React / Vite" aria-label="Voir le code source" class="glass h-10 px-3 rounded-xl flex items-center gap-2 active:scale-95 transition text-[13px] font-bold hover:bg-white/10">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>
           <span class="hidden sm:inline">Code React</span>
         </button>
       </div>
     </div>
-
-    <!-- Barre de recherche Nominatim -->
     <div class="glass rounded-2xl relative shadow-xl">
       <div class="flex items-center gap-2 px-3.5 py-2.5">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.4" stroke-linecap="round">
-          <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
-        </svg>
-        <input id="searchInput" type="text" placeholder="Rechercher gare, arrêt, adresse…" autocomplete="off"
-          class="bg-transparent outline-none flex-1 text-[14px] font-medium placeholder:text-slate-400 min-w-0"
-          style="color:var(--text)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="searchInput" type="text" placeholder="Rechercher gare, arrêt, adresse…" autocomplete="off" class="bg-transparent outline-none flex-1 text-[14px] font-medium placeholder:text-slate-400 min-w-0" style="color:var(--text)">
         <button id="searchClear" class="hidden w-7 h-7 rounded-lg chip items-center justify-center text-[12px] font-bold" aria-label="Effacer">✕</button>
         <div id="searchSpinner" class="hidden w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
       <div id="searchResults" class="hidden absolute top-full left-0 right-0 mt-2 glass-strong rounded-2xl overflow-hidden shadow-2xl border z-[1100]"></div>
     </div>
-
-    <!-- Badges d'état -->
     <div class="flex gap-2 mt-2 flex-wrap">
       <div class="glass rounded-full px-3 py-1.5 text-[11px] font-bold flex items-center gap-2">
         <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse" id="gpsDot"></span>
         <span id="gpsText">Localisation…</span>
+      </div>
+      <div class="hidden glass rounded-full px-2.5 py-1.5 text-[10px] font-bold border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 items-center gap-1.5" id="mapBadge">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Google Maps • CARTO Voyager
       </div>
       <div id="destBadge" class="glass rounded-full px-3 py-1.5 text-[11px] font-bold hidden items-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-[#ff2d55]"></span>
@@ -355,84 +192,50 @@
   </div>
 </header>
 
-<!-- ================= COMMANDES CARTE ================= -->
 <div class="absolute right-3 md:right-4 top-[186px] md:top-[196px] z-[1000] flex flex-col gap-2">
-  <button id="locateBtn" title="Me centrer" aria-label="Me centrer"
-    class="glass w-11 h-11 rounded-2xl flex items-center justify-center active:scale-90 transition shadow-lg">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-      <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/>
-    </svg>
-  </button>
-  <button id="fitBtn" title="Voir l'ensemble du trajet" aria-label="Voir tout le trajet"
-    class="glass w-11 h-11 rounded-2xl hidden items-center justify-center active:scale-90 transition shadow-lg">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M16 21h3a2 2 0 0 0 2-2v-3M8 21H5a2 2 0 0 1-2-2v-3"/>
-    </svg>
-  </button>
-  <button id="zoomIn" title="Zoom avant" aria-label="Zoom avant"
-    class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-90 transition shadow-lg">+</button>
-  <button id="zoomOut" title="Zoom arrière" aria-label="Zoom arrière"
-    class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-90 transition shadow-lg">−</button>
+  <button id="locateBtn" title="Me centrer" aria-label="Me centrer" class="glass w-11 h-11 rounded-2xl flex items-center justify-center active:scale-90 transition shadow-lg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button>
+  <button id="fitBtn" title="Voir l'ensemble du trajet" aria-label="Voir tout le trajet" class="glass w-11 h-11 rounded-2xl hidden items-center justify-center active:scale-90 transition shadow-lg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M16 21h3a2 2 0 0 0 2-2v-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg></button>
+  <button id="zoomIn" title="Zoom avant" aria-label="Zoom avant" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-90 transition shadow-lg">+</button>
+  <button id="zoomOut" title="Zoom arrière" aria-label="Zoom arrière" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-90 transition shadow-lg">−</button>
 </div>
 
-<!-- ================= MINI BOUSSOLE ================= -->
 <div id="miniCompass" class="hidden absolute left-3 md:left-4 top-[186px] md:top-[196px] z-[1000] glass rounded-2xl p-3 w-[88px] text-center shadow-xl">
   <div class="relative w-14 h-14 mx-auto rounded-full chip flex items-center justify-center overflow-hidden">
     <div class="absolute text-[9px] font-black top-1 text-dim">N</div>
-    <svg id="compassArrow" width="28" height="28" viewBox="0 0 24 24" fill="#ff2d55">
-      <path d="M12 2 19 21l-7-4-7 4z"/>
-    </svg>
+    <svg id="compassArrow" width="28" height="28" viewBox="0 0 24 24" fill="#ff2d55"><path d="M12 2 19 21l-7-4-7 4z"/></svg>
   </div>
   <div id="compassDist" class="mt-1.5 text-[12px] font-display font-bold">—</div>
   <div class="text-[9px] text-dim font-bold uppercase tracking-wider">restants</div>
 </div>
 
-<!-- ================= BOTTOM SHEET ================= -->
 <div id="bottomSheet" class="absolute bottom-0 inset-x-0 md:inset-x-auto md:left-4 md:bottom-4 md:w-[402px] z-[1001]">
   <div class="glass md:rounded-3xl rounded-t-[28px] border-b-0 md:border-b overflow-hidden shadow-2xl">
-
     <button id="sheetHandle" class="w-full pt-3 pb-1 flex flex-col items-center gap-1 cursor-pointer md:cursor-default" aria-label="Déplier ou replier le panneau">
       <div class="w-12 h-1.5 rounded-full bg-slate-400/50 md:hidden"></div>
       <div id="sheetHint" class="text-[9.5px] font-bold tracking-[.18em] uppercase text-dim md:hidden">Glisser pour voir la carte</div>
     </button>
-
     <div class="sheet-scroll px-4 md:px-5 pb-4 safe-bottom" style="max-height:calc(82vh - 52px)">
-
-      <!-- ============ ÉCRAN 1 : CONFIGURATION ============ -->
       <div id="panelSetup">
-
-        <!-- Étape 1 — Destination -->
         <div class="flex items-center gap-2 mb-2">
           <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-[#ff2d55] to-[#ff7a45] text-white text-[12px] font-black flex items-center justify-center">1</span>
           <h2 class="font-display font-bold text-[15px]">Destination</h2>
           <span class="ml-auto text-[11px] text-dim font-semibold hidden sm:block">Touchez la carte 📍</span>
         </div>
-
-        <div id="noDestCard" class="rounded-2xl border-2 border-dashed p-4 text-center transition"
-             style="border-color:var(--border); background:var(--chip)">
+        <div id="noDestCard" class="rounded-2xl border-2 border-dashed p-4 text-center transition" style="border-color:var(--border); background:var(--chip)">
           <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-[#ff2d55]/20 to-purple-500/20 flex items-center justify-center mb-2 border" style="border-color:var(--border)">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff2d55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff2d55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
-          <p class="text-[13px] font-bold">Touchez la carte pour poser votre épingle</p>
+          <p class="text-[13px] font-bold">Touchez la carte Google Maps pour poser votre épingle</p>
           <p class="text-[11.5px] text-dim mt-0.5">ou cherchez votre station ci-dessus</p>
-          <button id="demoDestBtn" class="mt-3 text-[12px] font-bold px-4 py-2 rounded-xl chip hover:bg-indigo-500/20 transition">
-            ✨ Exemple : Gare de Lyon, Paris
-          </button>
+          <button id="demoDestBtn" class="mt-3 text-[12px] font-bold px-4 py-2 rounded-xl chip hover:bg-indigo-500/20 transition">✨ Exemple : Gare de Lyon, Paris</button>
         </div>
-
         <div id="destCard" class="hidden rounded-2xl p-3.5 border border-[#ff2d55]/40 bg-gradient-to-br from-[#ff2d55]/10 to-purple-500/10">
           <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff2d55] to-[#ff7a45] flex items-center justify-center shrink-0 shadow-alertGlow">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>
-              </svg>
-            </div>
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff2d55] to-[#ff7a45] flex items-center justify-center shrink-0 shadow-alertGlow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
             <div class="flex-1 min-w-0">
               <div id="destName" class="text-[14px] font-bold leading-tight truncate">Destination</div>
               <div id="destCoords" class="text-[11px] text-dim font-mono mt-0.5">—</div>
-              <div id="destDirectDist" class="text-[12px] font-bold text-cyan-400 mt-1">— à vol d'oiseau</div>
+              <div id="destDirectDist" class="text-[12px] font-bold text-cyan-500 mt-1">— à vol d'oiseau</div>
             </div>
             <button id="clearDestBtn" class="w-8 h-8 rounded-lg chip flex items-center justify-center text-[13px] shrink-0 hover:bg-red-500/20" title="Supprimer l'épingle" aria-label="Supprimer l'épingle">✕</button>
           </div>
@@ -441,13 +244,10 @@
             <button id="changeDestBtn" class="flex-1 text-[12px] font-bold py-2 rounded-xl chip">Changer (carte)</button>
           </div>
         </div>
-
         <div id="recentWrap" class="hidden mt-2">
           <div class="text-[10.5px] font-bold text-dim uppercase tracking-wider mb-1.5">Récents</div>
           <div id="recentList" class="flex gap-2 overflow-x-auto pb-1"></div>
         </div>
-
-        <!-- Étape 2 — Rayon -->
         <div class="flex items-center gap-2 mt-4 mb-2">
           <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 text-white text-[12px] font-black flex items-center justify-center">2</span>
           <h2 class="font-display font-bold text-[15px]">Rayon d'alerte</h2>
@@ -461,2128 +261,1052 @@
             <button data-radius="2000" class="radius-pill chip rounded-xl py-2 text-[12px] font-bold">2km</button>
           </div>
           <input id="radiusSlider" type="range" min="100" max="5000" step="50" value="500" aria-label="Rayon d'alerte">
-          <div class="flex justify-between text-[10px] text-dim font-bold mt-1">
-            <span>100m — proche</span><span>5km — large</span>
-          </div>
-          <p class="text-[11.5px] text-dim mt-2 leading-snug">
-            🔔 L'alarme sonnera <b id="radiusExplain" style="color:var(--text)">500 m avant l'arrivée</b>.
-            Recommandé : 200 m en bus/tram, 500 m en métro, 1–2 km en train/RER.
-          </p>
+          <div class="flex justify-between text-[10px] text-dim font-bold mt-1"><span>100m — proche</span><span>5km — large</span></div>
+          <p class="text-[11.5px] text-dim mt-2 leading-snug">🔔 L'alarme sonnera à <b id="radiusExplain" style="color:var(--text)">500 m avant l'arrivée</b>. Recommandé : 200 m en bus/tram, 500 m en métro, 1–2 km en train/RER.</p>
         </div>
-
-        <!-- Étape 3 — Alarme & options -->
         <div class="flex items-center gap-2 mt-4 mb-2">
           <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[12px] font-black flex items-center justify-center">3</span>
-          <h2 class="font-display font-bold text-[15px]">Alarme &amp; options</h2>
+          <h2 class="font-display font-bold text-[15px]">Alarme & options</h2>
         </div>
-
         <div class="grid grid-cols-3 gap-2 mb-2">
-          <button data-alarm="siren" class="alarm-type active rounded-2xl p-2.5 text-center border" style="background:var(--chip); border-color:var(--border)">
-            <div class="text-[20px] leading-none">🚨</div>
-            <div class="text-[11px] font-bold mt-1">Sirène</div>
-            <div class="text-[9px] text-dim">Forte</div>
-          </button>
-          <button data-alarm="urgent" class="alarm-type rounded-2xl p-2.5 text-center border" style="background:var(--chip); border-color:var(--border)">
-            <div class="text-[20px] leading-none">⏰</div>
-            <div class="text-[11px] font-bold mt-1">Urgent</div>
-            <div class="text-[9px] text-dim">Bips ×3</div>
-          </button>
-          <button data-alarm="soft" class="alarm-type rounded-2xl p-2.5 text-center border" style="background:var(--chip); border-color:var(--border)">
-            <div class="text-[20px] leading-none">🔔</div>
-            <div class="text-[11px] font-bold mt-1">Douce</div>
-            <div class="text-[9px] text-dim">Carillon</div>
-          </button>
+          <button data-alarm="siren" class="alarm-type active rounded-2xl p-2.5 text-center border" style="background:var(--chip); border-color:var(--border)"><div class="text-[20px] leading-none">🚨</div><div class="text-[11px] font-bold mt-1">Sirène</div><div class="text-[9px] text-dim">Forte</div></button>
+          <button data-alarm="urgent" class="alarm-type rounded-2xl p-2.5 text-center border" style="background:var(--chip); border-color:var(--border)"><div class="text-[20px] leading-none">⏰</div><div class="text-[11px] font-bold mt-1">Urgent</div><div class="text-[9px] text-dim">Bips ×3</div></button>
+          <button data-alarm="soft" class="alarm-type rounded-2xl p-2.5 text-center border" style="background:var(--chip); border-color:var(--border)"><div class="text-[20px] leading-none">🔔</div><div class="text-[11px] font-bold mt-1">Douce</div><div class="text-[9px] text-dim">Carillon</div></button>
         </div>
-
         <div class="flex gap-2">
-          <button id="testSoundBtn" class="flex-1 rounded-xl py-2.5 text-[12px] font-bold chip flex items-center justify-center gap-2">
-            <span id="testSoundIcon">▶</span> Tester le son
-            <span id="testEQ" class="eq hidden"><span></span><span></span><span></span></span>
-          </button>
-          <div class="flex-1 rounded-xl px-3 py-2 chip flex items-center justify-between">
-            <span class="text-[12px] font-bold">📳 Vibrer</span>
-            <div id="vibToggle" class="toggle on" role="switch" aria-checked="true"></div>
-          </div>
+          <button id="testSoundBtn" class="flex-1 rounded-xl py-2.5 text-[12px] font-bold chip flex items-center justify-center gap-2"><span id="testSoundIcon">▶</span> Tester le son <span id="testEQ" class="eq hidden"><span></span><span></span><span></span></span></button>
+          <div class="flex-1 rounded-xl px-3 py-2 chip flex items-center justify-between"><span class="text-[12px] font-bold">📳 Vibrer</span><div id="vibToggle" class="toggle on" role="switch" aria-checked="true"></div></div>
         </div>
-
         <div class="rounded-xl px-3 py-2.5 mt-2 chip flex items-center justify-between">
-          <div class="min-w-0 pr-2">
-            <div class="text-[12px] font-bold">🧪 Mode démo (simulation GPS)</div>
-            <div class="text-[10.5px] text-dim">Simule un trajet pour tester sans bouger</div>
-          </div>
+          <div class="min-w-0 pr-2"><div class="text-[12px] font-bold">🧪 Mode démo (simulation GPS)</div><div class="text-[10.5px] text-dim">Simule un trajet pour tester sans bouger</div></div>
           <div id="demoToggle" class="toggle" role="switch" aria-checked="false"></div>
         </div>
-
-        <div class="rounded-xl px-3 py-2.5 mt-2 chip flex items-center justify-between">
-          <div class="min-w-0 pr-2">
-            <div class="text-[12px] font-bold">📢 Unity Ads — Interstitiel</div>
-            <div class="text-[10.5px] text-dim font-mono truncate">BP_Interstitial_Android</div>
-          </div>
+        <div class="rounded-xl px-3 py-2.5 mt-2 chip flex items-center justify-between" style="border-color:rgba(245,158,11,.25)">
+          <div class="min-w-0 pr-2"><div class="text-[12px] font-bold">📢 Unity Ads</div><div class="text-[10.5px] text-dim font-mono truncate">Interstitiel: BP_Interstitial_Android</div><div class="text-[10px] text-dim font-mono truncate">Bannière: BP_Banner_Android</div></div>
           <div id="adsToggle" class="toggle on" role="switch" aria-checked="true"></div>
         </div>
-
-        <button id="testAdBtn" class="w-full mt-2 rounded-xl py-2.5 text-[12px] font-bold chip flex items-center justify-center gap-2 hover:bg-amber-500/15 transition">
-          🎬 Tester l'interstitiel
-          <span class="text-dim font-mono text-[10px]" id="adsCountTxt">(0 diffusé)</span>
-        </button>
-
-        <button id="startBtn" disabled
-          class="btn-primary w-full mt-4 rounded-2xl py-4 font-display font-bold text-[16px] text-white flex items-center justify-center gap-2">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          Démarrer le suivi du trajet
-        </button>
-        <p id="startHint" class="text-center text-[11.5px] text-dim mt-2 font-semibold">Définissez une destination pour activer le suivi</p>
-        <p class="text-center text-[10px] text-dim mt-1.5 opacity-75">100% front-end • Formule de Haversine temps réel • Sans backend</p>
-      </div>
-
-      <!-- ============ ÉCRAN 2 : SUIVI EN DIRECT ============ -->
-      <div id="panelTracking" class="hidden">
-
-        <div class="flex items-center gap-2 mb-3">
-          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40">
-            <span class="live-dot"></span>
-            <span class="text-[10.5px] font-black tracking-widest text-green-500">SUIVI GPS ACTIF</span>
-          </div>
-          <div class="ml-auto text-right">
-            <div id="elapsedTime" class="font-mono font-bold text-[14px]">00:00</div>
-            <div id="trackAccuracy" class="text-[10px] text-dim font-bold">GPS ±—</div>
-          </div>
+        <div class="text-[10px] font-mono text-dim mt-1.5 px-1">Game ID: 7ebeaf82-0660-464a-8c58-a299ae5d3091</div>
+        <div class="flex gap-2 mt-2">
+          <button id="testAdBtn" class="flex-1 rounded-xl py-2.5 text-[12px] font-bold chip flex items-center justify-center gap-2 hover:bg-amber-500/15 transition">🎬 Tester l'interstitiel <span class="text-dim font-mono text-[10px]" id="adsCountTxt">(0 diffusé)</span></button>
+          <button id="testBannerBtn" class="flex-1 rounded-xl py-2.5 text-[12px] font-bold chip flex items-center justify-center gap-2 hover:bg-indigo-500/15 transition">🖼️ Bannière</button>
         </div>
-
-        <div class="rounded-3xl p-5 text-center relative overflow-hidden border border-indigo-500/30"
-             style="background:linear-gradient(135deg, rgba(99,102,241,.18), rgba(34,211,238,.10))">
+        <div class="rounded-xl px-3 py-2 mt-2 flex items-center gap-2 text-[11px] font-semibold" style="background:rgba(34,211,238,.08); border:1px solid rgba(34,211,238,.20)">
+          <span class="w-6 h-6 rounded-lg bg-white flex items-center justify-center text-[12px]">🗺️</span>
+          <span class="text-dim">Carte : <b style="color:var(--text)">Google Maps style</b> via CARTO Voyager</span>
+          <span class="ml-auto text-[10px] font-mono text-dim hidden sm:inline">voyager/{z}/{x}/{y}.png</span>
+        </div>
+        <button id="startBtn" disabled class="btn-primary w-full mt-4 rounded-2xl py-4 font-display font-bold text-[16px] text-white flex items-center justify-center gap-2"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Démarrer le suivi du trajet</button>
+        <p id="startHint" class="text-center text-[11.5px] text-dim mt-2 font-semibold">Définissez une destination pour activer le suivi</p>
+        <p class="text-center text-[10px] text-dim mt-1.5 opacity-75">100% front-end • Haversine temps réel • Sans backend • Unity Ads</p>
+      </div>
+      <div id="panelTracking" class="hidden">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40"><span class="live-dot"></span><span class="text-[10.5px] font-black tracking-widest text-green-500">SUIVI GPS ACTIF</span></div>
+          <div class="ml-auto text-right"><div id="elapsedTime" class="font-mono font-bold text-[14px]">00:00</div><div id="trackAccuracy" class="text-[10px] text-dim font-bold">GPS ±—</div></div>
+        </div>
+        <div class="rounded-3xl p-5 text-center relative overflow-hidden border border-indigo-500/30" style="background:linear-gradient(135deg, rgba(99,102,241,.18), rgba(34,211,238,.10))">
           <div class="text-[10.5px] font-bold tracking-[.2em] uppercase text-dim">Distance restante</div>
           <div id="liveDistance" class="font-display font-bold text-[52px] leading-none mt-1 tracking-tight">—</div>
           <div id="liveSub" class="text-[12.5px] text-dim font-semibold mt-1.5">Calcul de l'itinéraire…</div>
-          <div class="mt-3.5 h-2.5 rounded-full overflow-hidden bg-black/25 border border-white/10">
-            <div id="trackingProgress" class="h-full rounded-full" style="width:0%;background:linear-gradient(90deg,#6366f1,#22d3ee)"></div>
-          </div>
+          <div class="mt-3.5 h-2.5 rounded-full overflow-hidden bg-black/25 border border-white/10"><div id="trackingProgress" class="h-full rounded-full" style="width:0%;background:linear-gradient(90deg,#6366f1,#22d3ee)"></div></div>
         </div>
-
-        <div class="flex justify-between mt-1.5 text-[10px] font-bold text-dim">
-          <span>DÉPART</span>
-          <span id="progressPct">0%</span>
-          <span id="progressTarget">ALERTE À 500M</span>
-        </div>
-
-        <div id="insideBadge" class="hidden mt-2 px-3 py-1 rounded-full bg-[#ff2d55] text-white text-[11px] font-black animate-pulse text-center">
-          📍 DANS LA ZONE D'ALERTE
-        </div>
-
+        <div class="flex justify-between mt-1.5 text-[10px] font-bold text-dim"><span>DÉPART</span><span id="progressPct">0%</span><span id="progressTarget">ALERTE À 500M</span></div>
+        <div id="insideBadge" class="hidden mt-2 px-3 py-1 rounded-full bg-[#ff2d55] text-white text-[11px] font-black animate-pulse text-center">📍 DANS LA ZONE D'ALERTE</div>
         <div class="grid grid-cols-4 gap-2 mt-3">
-          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)">
-            <div id="statSpeed" class="font-display font-bold text-[15px]">0</div>
-            <div class="text-[9px] text-dim font-bold uppercase">km/h</div>
-          </div>
-          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)">
-            <div id="statCap" class="font-display font-bold text-[15px]">—</div>
-            <div class="text-[9px] text-dim font-bold uppercase">Cap</div>
-          </div>
-          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)">
-            <div id="statEta" class="font-display font-bold text-[15px]">—</div>
-            <div class="text-[9px] text-dim font-bold uppercase">ETA</div>
-          </div>
-          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)">
-            <div id="statRadius" class="font-display font-bold text-[15px]">500m</div>
-            <div class="text-[9px] text-dim font-bold uppercase">Rayon</div>
-          </div>
+          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)"><div id="statSpeed" class="font-display font-bold text-[15px]">0</div><div class="text-[9px] text-dim font-bold uppercase">km/h</div></div>
+          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)"><div id="statCap" class="font-display font-bold text-[15px]">—</div><div class="text-[9px] text-dim font-bold uppercase">Cap</div></div>
+          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)"><div id="statEta" class="font-display font-bold text-[15px]">—</div><div class="text-[9px] text-dim font-bold uppercase">ETA</div></div>
+          <div class="rounded-2xl p-2.5 text-center" style="background:var(--chip); border:1px solid var(--border)"><div id="statRadius" class="font-display font-bold text-[15px]">500m</div><div class="text-[9px] text-dim font-bold uppercase">Rayon</div></div>
         </div>
-
         <div class="rounded-2xl p-3 mt-2 flex items-center gap-3" style="background:var(--chip); border:1px solid var(--border)">
-          <div class="w-10 h-10 rounded-full chip flex items-center justify-center shrink-0 overflow-hidden">
-            <svg id="panelArrow" width="22" height="22" viewBox="0 0 24 24" fill="#22d3ee"><path d="M12 2 19 21l-7-4-7 4z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div id="headingText" class="text-[12px] font-bold">Direction : —</div>
-            <input id="radiusSliderLive" type="range" min="100" max="5000" step="50" value="500" class="mt-1.5 sm" aria-label="Rayon d'alerte en direct">
-          </div>
+          <div class="w-10 h-10 rounded-full chip flex items-center justify-center shrink-0 overflow-hidden"><svg id="panelArrow" width="22" height="22" viewBox="0 0 24 24" fill="#22d3ee"><path d="M12 2 19 21l-7-4-7 4z"/></svg></div>
+          <div class="flex-1 min-w-0"><div id="headingText" class="text-[12px] font-bold">Direction : —</div><input id="radiusSliderLive" type="range" min="100" max="5000" step="50" value="500" class="mt-1.5 sm" aria-label="Rayon d'alerte en direct"></div>
         </div>
-
-        <div id="wakeInfo" class="hidden mt-2 text-[11px] font-bold text-green-500 items-center gap-1.5">
-          🔆 Écran maintenu allumé pendant le trajet
-        </div>
-
+        <div id="wakeInfo" class="hidden mt-2 text-[11px] font-bold text-green-500 items-center gap-1.5">🔆 Écran maintenu allumé pendant le trajet</div>
         <div class="flex gap-2 mt-3">
           <button id="muteBtn" class="flex-1 rounded-2xl py-3.5 text-[13px] font-bold chip">🔕 Couper son</button>
-          <button id="stopBtn" class="flex-[2] rounded-2xl py-3.5 font-display font-bold text-[14px] text-white bg-gradient-to-r from-[#ff2d55] to-[#ff6b4a] shadow-alertGlow active:scale-[.98] transition flex items-center justify-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-            Arrêter le suivi
-          </button>
+          <button id="stopBtn" class="flex-[2] rounded-2xl py-3.5 font-display font-bold text-[14px] text-white bg-gradient-to-r from-[#ff2d55] to-[#ff6b4a] shadow-alertGlow active:scale-[.98] transition flex items-center justify-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Arrêter le suivi</button>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ================= OVERLAY ALARME PLEIN ÉCRAN ================= -->
 <div id="alarmOverlay" class="fixed inset-0 z-[2000] items-center justify-center p-5">
-  <div class="alarm-bg"></div>
-  <div class="strobe"></div>
-  <div class="absolute top-0 left-0 right-0 h-2 overflow-hidden bg-black/40">
-    <div class="flash-bar h-full w-1/2 bg-white/90"></div>
-  </div>
-
+  <div class="alarm-bg"></div><div class="strobe"></div>
+  <div class="absolute top-0 left-0 right-0 h-2 overflow-hidden bg-black/40"><div class="flash-bar h-full w-1/2 bg-white/90"></div></div>
   <div class="relative w-full max-w-md text-center text-white">
-    <div class="alarm-ring inline-flex w-24 h-24 rounded-full bg-white items-center justify-center shadow-2xl mb-4">
-      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
-      </svg>
-    </div>
-
-    <div class="inline-block px-4 py-1 rounded-full bg-white/20 border border-white/40 text-[10.5px] font-black tracking-[.25em] mb-3 backdrop-blur">
-      ⚠️ ALERTE PROXIMITÉ ⚠️
-    </div>
-
-    <h1 class="font-display font-bold text-[34px] sm:text-[42px] leading-[1.05] drop-shadow-2xl">
-      Vous arrivez<br>à destination !
-    </h1>
-
-    <div class="mt-4 inline-flex items-center gap-3 bg-black/40 backdrop-blur-xl rounded-2xl px-6 py-3 border border-white/30">
-      <div>
-        <div id="alarmDistance" class="font-display font-bold text-[30px] leading-none">0 m</div>
-        <div class="text-[10.5px] font-bold opacity-80 tracking-widest mt-1">DISTANCE RESTANTE</div>
-      </div>
-    </div>
-
+    <div class="alarm-ring inline-flex w-24 h-24 rounded-full bg-white items-center justify-center shadow-2xl mb-4"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+    <div class="inline-block px-4 py-1 rounded-full bg-white/20 border border-white/40 text-[10.5px] font-black tracking-[.25em] mb-3 backdrop-blur">⚠️ ALERTE PROXIMITÉ ⚠️</div>
+    <h1 class="font-display font-bold text-[34px] sm:text-[42px] leading-[1.05] drop-shadow-2xl">Vous arrivez<br>à destination !</h1>
+    <div class="mt-4 inline-flex items-center gap-3 bg-black/40 backdrop-blur-xl rounded-2xl px-6 py-3 border border-white/30"><div><div id="alarmDistance" class="font-display font-bold text-[30px] leading-none">0 m</div><div class="text-[10.5px] font-bold opacity-80 tracking-widest mt-1">DISTANCE RESTANTE</div></div></div>
     <p id="alarmDest" class="mt-3 text-[14px] font-semibold opacity-90 truncate px-4">—</p>
-
-    <div class="flex items-center justify-center gap-2 mt-2 text-[12px] font-bold opacity-90">
-      <span class="eq"><span style="background:#fff"></span><span style="background:#fff"></span><span style="background:#fff"></span></span>
-      Alarme sonore + vibration actives
-    </div>
-
+    <div id="alarmEqRow" class="flex items-center justify-center gap-2 mt-2 text-[12px] font-bold opacity-90"><span class="eq"><span style="background:#fff"></span><span style="background:#fff"></span><span style="background:#fff"></span></span> Alarme sonore + vibration actives</div>
     <div class="grid gap-2.5 mt-6">
-      <button id="alarmStopAll" class="btn-alert rounded-2xl py-4 font-display font-bold text-[16px] active:scale-[.98] transition">
-        ■ Arrêter l'alarme et le suivi
-      </button>
-      <button id="alarmContinue" class="rounded-2xl py-3.5 font-bold text-[14px] bg-white/15 border-2 border-white/50 backdrop-blur active:scale-[.98] transition">
-        Continuer jusqu'à l'arrêt (couper le son)
-      </button>
+      <button id="alarmStopAll" class="btn-alert rounded-2xl py-4 font-display font-bold text-[16px] active:scale-[.98] transition">■ Arrêter l'alarme et le suivi</button>
+      <button id="alarmContinue" class="rounded-2xl py-3.5 font-bold text-[14px] bg-white/15 border-2 border-white/50 backdrop-blur active:scale-[.98] transition">Continuer jusqu'à l'arrêt (couper le son)</button>
     </div>
     <p class="mt-3 text-[11px] opacity-70 font-semibold">Préparez-vous à descendre • Vérifiez vos affaires</p>
   </div>
 </div>
 
-<!-- ================= ONBOARDING ================= -->
 <div id="onboarding" class="fixed inset-0 z-[1800] items-center justify-center p-5 bg-black/70 backdrop-blur-md">
-  <div class="glass-strong rounded-3xl max-w-sm w-full p-6 relative overflow-hidden shadow-2xl"
-       style="background:linear-gradient(160deg,#131b3d,#0a0f1e)">
+  <div class="glass-strong rounded-3xl max-w-sm w-full p-6 relative overflow-hidden shadow-2xl" style="background:linear-gradient(160deg,#131b3d,#0a0f1e)">
     <div class="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-gradient-to-br from-indigo-500/40 to-pink-500/30 blur-3xl"></div>
     <button id="onboardSkip" class="absolute top-4 right-4 text-[12px] font-bold text-slate-400 hover:text-white px-3 py-1.5 z-10">Passer ✕</button>
-
     <div class="relative">
-      <div class="slide active" data-slide="0">
-        <div class="text-[52px] mb-3 leading-none">😴🚇</div>
-        <h2 class="font-display font-bold text-[24px] text-white leading-tight">
-          Dormez tranquille,<br>
-          <span class="bg-gradient-to-r from-indigo-400 to-cyan-300 bg-clip-text text-transparent">on vous réveille à l'arrêt.</span>
-        </h2>
-        <p class="text-slate-400 text-[14px] mt-3 leading-relaxed">
-          ARRIVA surveille votre position GPS et déclenche une <b class="text-white">alarme sonore + vibration</b> avant votre destination.
-        </p>
-      </div>
-
-      <div class="slide" data-slide="1">
-        <div class="text-[52px] mb-3 leading-none">📍🗺️</div>
-        <h2 class="font-display font-bold text-[24px] text-white leading-tight">
-          1. Touchez la carte<br>
-          <span class="text-[#ff7a9a]">pour poser votre épingle</span>
-        </h2>
-        <p class="text-slate-400 text-[14px] mt-3 leading-relaxed">
-          Cliquez n'importe où, ou recherchez une gare / adresse. Un cercle rouge affiche votre <b class="text-white">zone d'alerte</b>.
-        </p>
-      </div>
-
-      <div class="slide" data-slide="2">
-        <div class="text-[52px] mb-3 leading-none">⏱️🔔</div>
-        <h2 class="font-display font-bold text-[24px] text-white leading-tight">
-          2. Réglez le rayon<br>
-          <span class="text-cyan-300">puis démarrez le suivi</span>
-        </h2>
-        <p class="text-slate-400 text-[14px] mt-3 leading-relaxed">
-          200 m en bus, 500 m en métro, 1–2 km en train. Le calcul <b class="text-white">Haversine</b> tourne en temps réel, 100% côté client.
-        </p>
-      </div>
-
-      <div class="flex gap-1.5 mt-5 justify-center" id="onboardDots">
-        <div class="h-1.5 rounded-full bg-white transition-all" style="width:24px"></div>
-        <div class="h-1.5 rounded-full bg-white/25 transition-all" style="width:8px"></div>
-        <div class="h-1.5 rounded-full bg-white/25 transition-all" style="width:8px"></div>
-      </div>
-
-      <div class="flex gap-2 mt-4">
-        <button id="onboardNext" class="btn-primary flex-1 rounded-2xl py-3.5 font-bold text-white text-[15px]">Suivant →</button>
-      </div>
+      <div class="slide active" data-slide="0"><div class="text-[52px] mb-3 leading-none">😴🚇</div><h2 class="font-display font-bold text-[24px] text-white leading-tight">Dormez tranquille,<br><span class="bg-gradient-to-r from-indigo-400 to-cyan-300 bg-clip-text text-transparent">on vous réveille à l'arrêt.</span></h2><p class="text-slate-400 text-[14px] mt-3 leading-relaxed">ARRIVA surveille votre position GPS et déclenche une <b class="text-white">alarme sonore + vibration</b> avant votre destination. Carte <b class="text-white">Google Maps (Voyager)</b>.</p></div>
+      <div class="slide" data-slide="1"><div class="text-[52px] mb-3 leading-none">📍🗺️</div><h2 class="font-display font-bold text-[24px] text-white leading-tight">1. Touchez la carte<br><span class="text-[#ff7a9a]">pour poser votre épingle</span></h2><p class="text-slate-400 text-[14px] mt-3 leading-relaxed">Cliquez n'importe où sur la carte Google Maps, ou recherchez une gare / adresse. Un cercle rouge affiche votre <b class="text-white">zone d'alerte</b>.</p></div>
+      <div class="slide" data-slide="2"><div class="text-[52px] mb-3 leading-none">⏱️🔔</div><h2 class="font-display font-bold text-[24px] text-white leading-tight">2. Réglez le rayon<br><span class="text-cyan-300">puis démarrez le suivi</span></h2><p class="text-slate-400 text-[14px] mt-3 leading-relaxed">200 m en bus, 500 m en métro, 1–2 km en train. Le calcul <b class="text-white">Haversine</b> tourne en temps réel, 100% côté client. Pubs Unity non intrusives.</p></div>
+      <div class="flex gap-1.5 mt-5 justify-center" id="onboardDots"><div class="h-1.5 rounded-full bg-white transition-all" style="width:24px"></div><div class="h-1.5 rounded-full bg-white/25 transition-all" style="width:8px"></div><div class="h-1.5 rounded-full bg-white/25 transition-all" style="width:8px"></div></div>
+      <div class="flex gap-2 mt-4"><button id="onboardNext" class="btn-primary flex-1 rounded-2xl py-3.5 font-bold text-white text-[15px]">Suivant →</button></div>
       <button id="gpsEnableBtn" class="w-full mt-2 rounded-2xl py-3 text-[13px] font-bold bg-white/10 border border-white/15 text-white">📡 Activer ma position GPS</button>
     </div>
   </div>
 </div>
 
-<!-- ================= MODAL CODE SOURCE (React + Vite) ================= -->
 <div id="codeModal" class="fixed inset-0 z-[1900] items-center justify-center p-3 md:p-6 bg-black/75 backdrop-blur-md">
   <div class="w-full max-w-4xl h-[88vh] rounded-3xl overflow-hidden flex flex-col border border-white/15 shadow-2xl" style="background:#0b1126">
     <div class="flex items-center gap-3 px-5 py-4 border-b border-white/10 bg-white/[.03]">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-600 flex items-center justify-center font-mono font-bold text-white text-[13px]">&lt;/&gt;</div>
-      <div class="flex-1 min-w-0">
-        <div class="font-display font-bold text-white text-[15px]">Vite + React + Tailwind + Leaflet + Unity Ads</div>
-        <div class="text-[11.5px] text-slate-400">Code modulaire, commenté &amp; prêt pour la production</div>
-      </div>
+      <div class="flex-1 min-w-0"><div class="font-display font-bold text-white text-[15px]">Vite + React + Tailwind + Leaflet (Google Maps Voyager) + Unity Ads</div><div class="text-[11.5px] text-slate-400">Code modulaire, commenté & prêt pour la production</div></div>
       <button id="copyCodeBtn" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-bold transition flex items-center gap-1.5">⧉ Copier</button>
       <button id="codeClose" class="w-9 h-9 rounded-xl bg-white/10 text-white flex items-center justify-center hover:bg-white/20" aria-label="Fermer">✕</button>
     </div>
-
     <div class="flex gap-2 px-5 py-3 overflow-x-auto border-b border-white/10 bg-black/30" id="codeTabs">
       <button data-file="install" class="code-tab active whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">⚙️ install.md</button>
+      <button data-file="maps" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">🗺️ Google Maps</button>
       <button data-file="geo" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">📐 utils/geo.js</button>
-      <button data-file="ads" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">📢 utils/unityAds.js</button>
+      <button data-file="ads" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">📢 unityAds.js</button>
       <button data-file="map" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">🗺️ MapComponent.jsx</button>
-      <button data-file="alert" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">🔔 AlertControl.jsx</button>
       <button data-file="app" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">⚛️ App.jsx</button>
     </div>
-
-    <div class="flex-1 overflow-auto p-5 bg-[#070b1c]">
-      <pre class="code text-slate-200" id="codeContent"></pre>
-    </div>
-
-    <div class="px-5 py-3 border-t border-white/10 bg-white/[.02] text-[11px] text-slate-400 font-semibold">
-      💡 Solution 100% front-end sans clé d'API payante (Leaflet + OpenStreetMap/CARTO). Placement Unity Ads : <code class="font-mono text-amber-300">BP_Interstitial_Android</code>.
-    </div>
+    <div class="flex-1 overflow-auto p-5 bg-[#070b1c]"><pre class="code text-slate-200" id="codeContent"></pre></div>
+    <div class="px-5 py-3 border-t border-white/10 bg-white/[.02] text-[11px] text-slate-400 font-semibold">💡 Carte Google Maps style via <code class="font-mono text-cyan-300">CARTO Voyager + clé cb1_48if_1_e850e696c73ebaf5c2079f48</code> • Unity Ads : <code class="font-mono text-amber-300">7ebeaf82-0660-464a-8c58-a299ae5d3091 / BP_Interstitial_Android + BP_Banner_Android</code></div>
   </div>
 </div>
 
-<!-- ================= TOASTS ================= -->
 <div id="toasts" class="fixed top-[168px] md:top-4 left-4 right-4 md:left-auto md:right-4 md:w-[340px] z-[1600] flex flex-col gap-2 items-stretch pointer-events-none"></div>
 
-<!-- ================= OVERLAY INTERSTITIEL UNITY ADS ================= -->
 <div id="adOverlay" class="fixed inset-0 z-[2100] items-center justify-center p-4">
   <div class="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
-
   <div id="adCard" class="relative w-full max-w-[400px] rounded-3xl overflow-hidden border border-white/15 shadow-2xl" style="background:#0b1126">
     <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/[.03]">
-      <div class="flex items-center gap-2">
-        <span class="text-[9px] font-black tracking-[.15em] px-1.5 py-0.5 rounded bg-amber-400 text-black">PUBLICITÉ</span>
-        <span class="text-[10px] font-mono text-slate-500" id="adPlacement">BP_Interstitial_Android</span>
-      </div>
+      <div class="flex items-center gap-2"><span class="text-[9px] font-black tracking-[.15em] px-1.5 py-0.5 rounded bg-amber-400 text-black">PUBLICITÉ</span><span class="text-[10px] font-mono text-slate-500" id="adPlacement">BP_Interstitial_Android</span></div>
       <button id="adSkipBtn" disabled class="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-slate-300 disabled:opacity-60 transition">Ignorer dans 5s</button>
     </div>
-
-    <div id="adLoading" class="h-[300px] flex flex-col items-center justify-center gap-3">
-      <div class="w-9 h-9 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-      <div class="text-[12px] text-slate-400 font-semibold ad-pulse">Chargement de l'interstitiel Unity Ads…</div>
-      <div class="text-[10px] font-mono text-slate-600">Placement : BP_Interstitial_Android</div>
-    </div>
-
+    <div id="adLoading" class="h-[300px] flex flex-col items-center justify-center gap-3"><div class="w-9 h-9 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div><div class="text-[12px] text-slate-400 font-semibold ad-pulse">Chargement de l'interstitiel Unity Ads…</div><div class="text-[10px] font-mono text-slate-600">Game: 7ebeaf82-0660-464a-8c58-a299ae5d3091 • BP_Interstitial_Android</div></div>
     <div id="adCreative" class="hidden">
-      <div id="adHero" class="h-[190px] relative flex items-center justify-center overflow-hidden" style="background:linear-gradient(135deg,#2563eb,#7c3aed)">
-        <div class="ad-shine"></div>
-        <div class="text-[68px] drop-shadow-2xl" id="adEmoji">🚆</div>
-        <div class="absolute bottom-2 right-3 text-[10px] font-bold text-white/80" id="adBrand">—</div>
-      </div>
-      <div class="p-5">
-        <div id="adTitle" class="font-display font-bold text-white text-[19px] leading-tight">—</div>
-        <div id="adBody" class="text-slate-400 text-[13px] mt-1.5 leading-relaxed">—</div>
-        <button id="adCta" class="w-full mt-4 rounded-2xl py-3.5 font-bold text-white text-[14px] active:scale-[.98] transition">En savoir plus</button>
-        <div class="flex items-center justify-between mt-3 text-[10px] text-slate-500 font-semibold">
-          <span>Sponsorisé • Unity Ads</span>
-          <span id="adReason" class="font-mono">—</span>
-        </div>
-      </div>
+      <div id="adHero" class="h-[190px] relative flex items-center justify-center overflow-hidden" style="background:linear-gradient(135deg,#2563eb,#7c3aed)"><div class="ad-shine"></div><div class="text-[68px] drop-shadow-2xl" id="adEmoji">🚆</div><div class="absolute bottom-2 right-3 text-[10px] font-bold text-white/80" id="adBrand">—</div></div>
+      <div class="p-5"><div id="adTitle" class="font-display font-bold text-white text-[19px] leading-tight">—</div><div id="adBody" class="text-slate-400 text-[13px] mt-1.5 leading-relaxed">—</div><button id="adCta" class="w-full mt-4 rounded-2xl py-3.5 font-bold text-white text-[14px] active:scale-[.98] transition">En savoir plus</button><div class="flex items-center justify-between mt-3 text-[10px] text-slate-500 font-semibold"><span>Sponsorisé • Unity Ads</span><span id="adReason" class="font-mono">—</span></div></div>
     </div>
+    <div class="h-1 bg-white/10"><div id="adProgress" class="h-full w-0" style="background:linear-gradient(90deg,#fbbf24,#ec4899)"></div></div>
+  </div>
+</div>
 
-    <div class="h-1 bg-white/10">
-      <div id="adProgress" class="h-full w-0" style="background:linear-gradient(90deg,#fbbf24,#ec4899)"></div>
+<div id="bannerAd" class="fixed bottom-0 inset-x-0 z-[1400] justify-center p-2 md:p-3 pointer-events-none">
+  <div class="pointer-events-auto w-full max-w-[360px] rounded-2xl overflow-hidden border border-slate-200 shadow-[0_12px_40px_rgba(0,0,0,.35)] bg-white">
+    <div class="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-200">
+      <div class="flex items-center gap-2"><span class="text-[8px] font-black tracking-[.14em] px-1.5 py-0.5 rounded bg-amber-400 text-black">PUBLICITÉ</span><span class="text-[10px] font-mono text-slate-500">BP_Banner_Android</span></div>
+      <div class="flex items-center gap-2"><span class="text-[10px] font-mono text-slate-400 hidden sm:inline">320×50</span><button id="bannerClose" class="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[11px]">✕</button></div>
+    </div>
+    <div id="bannerCreative" class="h-[50px] flex items-center gap-3 px-3" style="background:linear-gradient(90deg,#0ea5e9,#6366f1)">
+      <div class="w-9 h-9 rounded-xl bg-white flex items-center justify-center text-[18px] shrink-0">🎧</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-white font-bold text-[12px] leading-none">AcousticPro ANC — -40%</div>
+        <div class="text-white/80 text-[11px] truncate">Silence absolu en train • 40h d'autonomie</div>
+      </div>
+      <button id="bannerCta" class="px-3 py-1.5 rounded-full bg-white text-slate-900 font-bold text-[11px] shrink-0">Installer</button>
     </div>
   </div>
 </div>
 
-<!-- ================= TEMPLATES DE CODE (React / Vite) ================= -->
-<script type="text/plain" id="file-install">
-# 🚀 ARRIVA — Installation (Vite + React + Tailwind + Leaflet + Unity Ads)
-
+<script type="text/plain" id="file-install"># 🚀 ARRIVA — Installation (Vite + React + Tailwind + Google Maps Voyager + Unity Ads)
 ```bash
 # 1. Créer le projet
 npm create vite@latest arriva-app -- --template react
 cd arriva-app
 
-# 2. Carte interactive
+# 2. Carte interactive — Leaflet avec tuiles Google Maps style (CARTO Voyager)
 npm install leaflet react-leaflet
 
 # 3. Tailwind CSS
 npm install -D tailwindcss postcss autoprefixer
 npx tailwindcss init -p
 
-# 4. Lancer le serveur de développement (HTTPS requis pour le GPS sur mobile)
+# 4. Lancer (HTTPS requis pour le GPS sur mobile)
 npm run dev -- --host
+```
+
+## .env — Clé tuiles Voyager (Google Maps style)
+```ini
+VITE_MAP_TILES_URL=https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_48if_1_e850e696c73ebaf5c2079f48
+# Variante fournie : cb1_48if_2_0f3fe5e8cce7bab4ee01bfc8 (même endpoint Voyager)
 ```
 
 ## tailwind.config.js
 ```js
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
-  theme: { extend: { fontFamily: {
-    sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-    display: ['Space Grotesk', 'sans-serif'],
-  } } },
-  plugins: [],
+  theme: { extend: { fontFamily: { sans: ['Plus Jakarta Sans','system-ui','sans-serif'] } } },
 }
 ```
 
-## src/index.css
-```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-@import 'leaflet/dist/leaflet.css';
+## Unity Ads — Identifiants fournis
+```js
+export const UNITY_ADS = {
+  gameId: '7ebeaf82-0660-464a-8c58-a299ae5d3091',
+  placementInterstitial: 'BP_Interstitial_Android',
+  placementBanner: 'BP_Banner_Android',
+  testMode: false,
+}
 ```
-
-## Arborescence
-```text
-src/
-├── utils/
-│   ├── geo.js            # Haversine, bearing, formatage
-│   └── unityAds.js       # Interstitiel BP_Interstitial_Android
-├── components/
-│   ├── MapComponent.jsx  # Carte Leaflet + marqueurs + cercle
-│   └── AlertControl.jsx  # Panneau de contrôle + alarme
-├── App.jsx               # État global + watchPosition
-└── main.jsx
-```
-
-## ── Intégration Android (WebView + SDK Unity Ads natif) ──
-```gradle
-// android/app/build.gradle
-implementation 'com.unity3d.ads:unity-ads:4.9.2'
-```
-```xml
-<!-- AndroidManifest.xml -->
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-```
-
-## ── Unity Dashboard ──
-- Game ID    : 5000000 (mode test)
-- Placement   : BP_Interstitial_Android
-- Type        : Interstitial (plein écran)
-- Passez `testMode: false` en production.
+- Dashboard Unity → Monetization → Placements : vérifier que les 2 placements existent et sont actifs.
+- Type Interstitial = plein écran, Banner = 320×50 ancré en bas (jamais pendant le suivi GPS).
 </script>
-
-<script type="text/plain" id="file-geo">
-// src/utils/geo.js
+<script type="text/plain" id="file-maps">// src/utils/maps.js — Fournisseur Google Maps style (CARTO Voyager)
 // ─────────────────────────────────────────────────────────────
-// Utilitaires géodésiques — pur JavaScript, sans dépendance.
-// Formule de Haversine + cap (bearing) + formatage lisible.
+// On utilise CARTO Voyager RasterTiles qui reprend le style
+// clair/épuré de Google Maps, sans clé Google facturable.
+// Deux clés fournies pointent sur le même endpoint Voyager.
 // ─────────────────────────────────────────────────────────────
+export const MAP_PROVIDER = {
+  name: 'Google Maps (CARTO Voyager)',
+  // Clé principale fournie
+  url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_48if_1_e850e696c73ebaf5c2079f48',
+  // Variante : cb1_48if_2_0f3fe5e8cce7bab4ee01bfc8
+  fallbackUrl: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_48if_2_0f3fe5e8cce7bab4ee01bfc8',
+  attribution: '&copy; OpenStreetMap &copy; CARTO &copy; Google Maps style',
+  maxZoom: 19,
+};
 
+// Usage avec react-leaflet :
+// <TileLayer url={MAP_PROVIDER.url} attribution={MAP_PROVIDER.attribution} maxZoom={19} />
+</script>
+<script type="text/plain" id="file-geo">// src/utils/geo.js — Formule de Haversine + cap + formatage
+// ─────────────────────────────────────────────────────────────
 const EARTH_RADIUS_M = 6371000;
 const toRad = (deg) => (deg * Math.PI) / 180;
 
-/**
- * Distance en mètres entre deux points géographiques (Haversine).
- * @param {{lat:number,lng:number}} from
- * @param {{lat:number,lng:number}} to
- * @returns {number|null}
- */
 export function haversineDistance(from, to) {
   if (!from || !to) return null;
   const dLat = toRad(to.lat - from.lat);
   const dLng = toRad(to.lng - from.lng);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLng / 2) ** 2;
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLng/2)**2;
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a));
 }
-
-/**
- * Cap (azimut) en degrés : 0° = Nord, 90° = Est, 180° = Sud, 270° = Ouest.
- */
-export function calculateBearing(from, to) {
-  if (!from || !to) return 0;
-  const dLng = toRad(to.lng - from.lng);
-  const y = Math.sin(dLng) * Math.cos(toRad(to.lat));
-  const x =
-    Math.cos(toRad(from.lat)) * Math.sin(toRad(to.lat)) -
-    Math.sin(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.cos(dLng);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+export function calculateBearing(from,to){
+  if(!from||!to) return 0;
+  const dLng=toRad(to.lng-from.lng);
+  const y=Math.sin(dLng)*Math.cos(toRad(to.lat));
+  const x=Math.cos(toRad(from.lat))*Math.sin(toRad(to.lat)) - Math.sin(toRad(from.lat))*Math.cos(toRad(to.lat))*Math.cos(dLng);
+  return ((Math.atan2(y,x)*180)/Math.PI+360)%360;
 }
-
-/** "450 m" ou "1.85 km" */
-export function formatDistance(meters) {
-  if (meters == null) return '—';
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  if (meters < 10000) return `${(meters / 1000).toFixed(2)} km`;
-  return `${(meters / 1000).toFixed(1)} km`;
+export function formatDistance(m){
+  if(m==null) return '—';
+  if(m<1000) return `${Math.round(m)} m`;
+  if(m<10000) return `${(m/1000).toFixed(2)} km`;
+  return `${(m/1000).toFixed(1)} km`;
 }
-
-/** "450m" ou "1.8km" (formats compacts pour les puces) */
-export function formatShort(meters) {
-  if (meters == null) return '—';
-  if (meters < 1000) return `${Math.round(meters)}m`;
-  return `${(meters / 1000).toFixed(meters < 10000 ? 2 : 1)}km`;
+export function formatShort(m){
+  if(m==null) return '—';
+  if(m<1000) return `${Math.round(m)}m`;
+  return `${(m/1000).toFixed(m<10000?2:1)}km`;
 }
-
-/** Libellé cardinal : "N", "NE", "E", "SE", "S", "SO", "O", "NO" */
-export function compassLabel(deg) {
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
-  return dirs[Math.round(deg / 45) % 8];
-}
-
-/** Proportion de déplacement linéaire (utile pour le mode démo). */
-export function moveTowards(from, to, meters) {
-  const dist = haversineDistance(from, to);
-  if (!dist) return { ...to };
-  const f = Math.min(1, meters / dist);
-  return {
-    lat: from.lat + (to.lat - from.lat) * f,
-    lng: from.lng + (to.lng - from.lng) * f,
-  };
+export function compassLabel(deg){
+  const dirs=['N','NE','E','SE','S','SO','O','NO'];
+  return dirs[Math.round(deg/45)%8];
 }
 </script>
-
-<script type="text/plain" id="file-ads">
-// src/utils/unityAds.js
+<script type="text/plain" id="file-ads">// src/utils/unityAds.js — Unity Ads (Interstitiel + Bannière)
 // ─────────────────────────────────────────────────────────────
-// Intégration Unity Ads — INTERSTITIEL plein écran
-// Placement : BP_Interstitial_Android
-//
-// Deux modes de fonctionnement :
-//  1. WebView Android : pont natif window.AndroidUnityAds
-//     (exposé par @JavascriptInterface côté Kotlin/Java)
-//  2. Web : SDK JS window.UnityAds (UnityAdsWeb.js)
+// Game ID : 7ebeaf82-0660-464a-8c58-a299ae5d3091
+// Placements : BP_Interstitial_Android (plein écran) + BP_Banner_Android (320x50)
+// Deux modes :
+//  1) WebView Android : window.AndroidUnityAds (exposé via @JavascriptInterface)
+//  2) Web : window.UnityAds (UnityAdsWeb.js)
+// Fallback “house ad” si SDK absent (dev desktop).
 // ─────────────────────────────────────────────────────────────
-
 export const UNITY_ADS = {
-  gameId: '5000000',                          // ← votre Game ID
+  gameId: '7ebeaf82-0660-464a-8c58-a299ae5d3091',
   placementInterstitial: 'BP_Interstitial_Android',
-  testMode: true,                             // false en production
+  placementBanner: 'BP_Banner_Android',
+  testMode: false,
 };
+const MIN_INTERVAL_MS = 30000;
+const MAX_PER_SESSION = 5;
+let lastShownAt = 0, sessionCount = 0;
 
-const MIN_INTERVAL_MS = 45000;  // anti-spam : 45 s minimum entre 2 pubs
-const MAX_PER_SESSION = 5;      // plafond par session
-
-let lastShownAt = 0;
-let sessionCount = 0;
-
-/** Détecte un pont natif ou le SDK web. */
-function bridge() {
-  if (window.AndroidUnityAds?.showInterstitial) {
-    return { type: 'android', api: window.AndroidUnityAds };
-  }
-  if (window.UnityAds?.show) {
-    return { type: 'web', api: window.UnityAds };
-  }
+function bridge(){
+  if(window.AndroidUnityAds?.showInterstitial) return {type:'android', api:window.AndroidUnityAds};
+  if(window.UnityAds?.show) return {type:'web', api:window.UnityAds};
   return null;
 }
+export function isUnityAdsAvailable(){ return bridge()!==null; }
 
-export function isUnityAdsAvailable() {
-  return bridge() !== null;
-}
-
-/** Initialise le SDK (à appeler une fois au démarrage). */
-export function initUnityAds() {
+export function initUnityAds(){
   const b = bridge();
-  try {
-    if (b?.type === 'android' && b.api.init) b.api.init(UNITY_ADS.gameId, UNITY_ADS.testMode);
-    if (b?.type === 'web' && b.api.initialize) b.api.initialize(UNITY_ADS.gameId, UNITY_ADS.testMode);
-  } catch (err) {
-    console.warn('[UnityAds] Échec init', err);
-  }
+  try{
+    if(b?.type==='android' && b.api.init) b.api.init(UNITY_ADS.gameId, UNITY_ADS.testMode);
+    if(b?.type==='web' && b.api.initialize) b.api.initialize(UNITY_ADS.gameId, UNITY_ADS.testMode);
+    // Bannière : chargement initial (320x50 en bas)
+    if(b?.type==='android' && b.api.loadBanner) b.api.loadBanner(UNITY_ADS.placementBanner);
+    if(b?.type==='web' && b.api.loadBanner) b.api.loadBanner(UNITY_ADS.placementBanner);
+  }catch(e){ console.warn('[UnityAds] init',e); }
 }
-
-/** Règles métier : jamais de pub pendant un suivi GPS actif. */
-export function canShowInterstitial(isTracking = false) {
-  if (isTracking) return false;
-  if (sessionCount >= MAX_PER_SESSION) return false;
-  if (Date.now() - lastShownAt < MIN_INTERVAL_MS) return false;
+export function canShowInterstitial(isTracking=false){
+  if(isTracking) return false; // jamais pendant le suivi
+  if(sessionCount>=MAX_PER_SESSION) return false;
+  if(Date.now()-lastShownAt < MIN_INTERVAL_MS) return false;
   return true;
 }
-
-/**
- * Affiche l'interstitiel BP_Interstitial_Android.
- * @param {string} reason  'app_open' | 'journey_ended' | 'manual_test'
- * @param {boolean} isTracking  true si un suivi est en cours (bloque la pub)
- */
-export function showInterstitial(reason = 'journey_ended', isTracking = false) {
-  if (!canShowInterstitial(isTracking)) return false;
+export function showInterstitial(reason='journey_ended', isTracking=false){
+  if(!canShowInterstitial(isTracking)) return false;
   const b = bridge();
-  try {
-    if (b?.type === 'android') {
-      const shown = b.api.showInterstitial(UNITY_ADS.placementInterstitial);
-      if (shown !== false) { lastShownAt = Date.now(); sessionCount++; return true; }
-    } else if (b?.type === 'web') {
-      b.api.show(UNITY_ADS.placementInterstitial);
-      lastShownAt = Date.now(); sessionCount++; return true;
-    }
-  } catch (err) {
-    console.warn('[UnityAds] Échec affichage', err);
-  }
-  return false; // en dev/desktop : fallback maison géré par l'UI
+  try{
+    if(b?.type==='android'){ const ok=b.api.showInterstitial(UNITY_ADS.placementInterstitial); if(ok!==false){ lastShownAt=Date.now(); sessionCount++; return true; } }
+    else if(b?.type==='web'){ b.api.show(UNITY_ADS.placementInterstitial); lastShownAt=Date.now(); sessionCount++; return true; }
+  }catch(e){ console.warn('[UnityAds] interstitiel',e); }
+  return false; // fallback géré par l'UI (house ad)
 }
-
-export function getAdsStats() {
-  return { sessionCount, lastShownAt };
+export function showBanner(){
+  const b = bridge();
+  try{
+    if(b?.type==='android' && b.api.showBanner) b.api.showBanner(UNITY_ADS.placementBanner);
+    if(b?.type==='web' && b.api.showBanner) b.api.showBanner(UNITY_ADS.placementBanner);
+  }catch(e){ console.warn('[UnityAds] bannière',e); }
 }
 </script>
-
-<script type="text/plain" id="file-map">
-// src/components/MapComponent.jsx
-import React, { useEffect } from 'react';
-import {
-  MapContainer, TileLayer, Marker, Circle, Polyline,
-  useMap, useMapEvents,
-} from 'react-leaflet';
+<script type="text/plain" id="file-map">// src/components/MapComponent.jsx — Google Maps style
+import { MapContainer, TileLayer, Marker, Circle, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { MAP_PROVIDER } from '../utils/maps';
 
-// ── Icône utilisateur (pulsation cyan) ──────────────────────
-const userIcon = L.divIcon({
-  className: '',
-  html: `<div style="position:relative;width:28px;height:28px;display:flex;align-items:center;justify-content:center">
-      <div style="position:absolute;inset:-10px;border-radius:50%;border:2px solid rgba(34,211,238,.6)"></div>
-      <div style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#6366f1);border:3px solid #fff;box-shadow:0 0 18px rgba(34,211,238,.8)"></div>
-    </div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-});
+const userIcon = L.divIcon({ className:'', html:`<div style="position:relative;width:28px;height:28px;display:flex;align-items:center;justify-content:center"><div style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#22d3ee,#6366f1);border:3px solid #fff;box-shadow:0 0 18px rgba(34,211,238,.8)"></div></div>`, iconSize:[28,28], iconAnchor:[14,14] });
+const destIcon = L.divIcon({ className:'', html:`<svg viewBox="0 0 44 52" style="width:44px;height:52px;filter:drop-shadow(0 8px 14px rgba(255,45,85,.45))"><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30s22-14 22-30C44 10 34 0 22 0z" fill="#ff2d55"/><circle cx="22" cy="21" r="9" fill="#fff"/><circle cx="22" cy="21" r="4.5" fill="#ff2d55"/></svg>`, iconSize:[44,52], iconAnchor:[22,50] });
 
-// ── Icône destination (épingle rouge) ───────────────────────
-const destIcon = L.divIcon({
-  className: '',
-  html: `<svg viewBox="0 0 44 52" style="width:44px;height:52px;filter:drop-shadow(0 8px 14px rgba(255,45,85,.45))">
-      <path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30s22-14 22-30C44 10 34 0 22 0z" fill="#ff2d55"/>
-      <path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30V0z" fill="#e11d48"/>
-      <circle cx="22" cy="21" r="9" fill="#fff"/>
-      <circle cx="22" cy="21" r="4.5" fill="#ff2d55"/>
-    </svg>`,
-  iconSize: [44, 52],
-  iconAnchor: [22, 50],
-});
+function ClickHandler({ onSelectDest }){ useMapEvents({ click(e){ onSelectDest({lat:e.latlng.lat, lng:e.latlng.lng}); } }); return null; }
 
-/** Recentre la carte quand la position change (hors suivi). */
-function MapController({ userPos, tracking }) {
-  const map = useMap();
-  useEffect(() => {
-    if (userPos && !tracking) {
-      map.flyTo([userPos.lat, userPos.lng], 15, { duration: 1.2 });
-    }
-  }, [userPos, tracking, map]);
-  return null;
-}
-
-/** Clic sur la carte = nouvelle destination. */
-function ClickHandler({ onSelectDest }) {
-  useMapEvents({
-    click(e) {
-      onSelectDest({ lat: e.latlng.lat, lng: e.latlng.lng });
-    },
-  });
-  return null;
-}
-
-export default function MapComponent({ userPos, destPos, radius, onSelectDest, tracking, dark }) {
-  const center = userPos ? [userPos.lat, userPos.lng] : [48.8566, 2.3522];
-  const url = dark
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-
+export default function MapComponent({ userPos, destPos, radius, onSelectDest }){
+  const center = userPos ? [userPos.lat, userPos.lng] : [48.8566,2.3522];
   return (
     <MapContainer center={center} zoom={14} zoomControl={false} className="h-full w-full">
-      <TileLayer url={url} maxZoom={19} attribution="&copy; OpenStreetMap &copy; CARTO" />
+      {/* Tuiles Google Maps style via CARTO Voyager */}
+      <TileLayer url={MAP_PROVIDER.url} maxZoom={19} attribution={MAP_PROVIDER.attribution} />
       <ClickHandler onSelectDest={onSelectDest} />
-      <MapController userPos={userPos} tracking={tracking} />
-
-      {/* Position utilisateur */}
-      {userPos && <Marker position={[userPos.lat, userPos.lng]} icon={userIcon} />}
-
-      {/* Destination + cercle du rayon d'alerte */}
-      {destPos && (
-        <>
-          <Marker position={[destPos.lat, destPos.lng]} icon={destIcon} draggable />
-          <Circle
-            center={[destPos.lat, destPos.lng]}
-            radius={radius}
-            pathOptions={{
-              color: '#ff2d55', weight: 2.5, opacity: 0.9,
-              dashArray: '10 7', fillColor: '#ff2d55', fillOpacity: 0.12,
-            }}
-          />
-        </>
-      )}
-
-      {/* Ligne de trajet directe */}
-      {userPos && destPos && (
-        <Polyline
-          positions={[[userPos.lat, userPos.lng], [destPos.lat, destPos.lng]]}
-          pathOptions={{ color: '#22d3ee', weight: 3, dashArray: '8 10', opacity: 0.8 }}
-        />
-      )}
+      {userPos && <Marker position={[userPos.lat,userPos.lng]} icon={userIcon} />}
+      {destPos && <>
+        <Marker position={[destPos.lat,destPos.lng]} icon={destIcon} draggable />
+        <Circle center={[destPos.lat,destPos.lng]} radius={radius} pathOptions={{color:'#ff2d55', weight:2.5, dashArray:'10 7', fillColor:'#ff2d55', fillOpacity:0.12}} />
+      </>}
+      {userPos && destPos && <Polyline positions={[[userPos.lat,userPos.lng],[destPos.lat,destPos.lng]]} pathOptions={{color:'#22d3ee', weight:3, dashArray:'8 10', opacity:0.8}} />}
     </MapContainer>
   );
 }
 </script>
-
-<script type="text/plain" id="file-alert">
-// src/components/AlertControl.jsx
-import React from 'react';
-import { formatDistance, formatShort } from '../utils/geo';
-
-const PRESETS = [200, 500, 1000, 2000];
-
-export default function AlertControl({
-  radius, setRadius, tracking, distance, alarm,
-  hasDestination, onStart, onStop, onMute, muted, alarmType, setAlarmType,
-}) {
-  return (
-    <div className="absolute bottom-0 inset-x-0 md:left-5 md:bottom-5 md:w-[400px] z-[1000]">
-      <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 rounded-t-3xl md:rounded-3xl p-5 shadow-2xl text-white">
-
-        {/* Bannière d'alerte */}
-        {alarm && (
-          <div className="mb-4 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 p-4 text-center animate-bounce shadow-xl">
-            <div className="text-2xl font-black">🚨 VOUS ARRIVEZ !</div>
-            <div className="text-sm font-bold opacity-90 mt-1">
-              Plus que {formatDistance(distance)} avant l'arrêt
-            </div>
-          </div>
-        )}
-
-        {!tracking ? (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-bold text-base">Rayon d'alerte</h2>
-              <span className="font-mono text-cyan-400 font-bold text-sm">{formatDistance(radius)}</span>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {PRESETS.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setRadius(p)}
-                  className={`rounded-xl py-2 text-xs font-bold transition ${
-                    p === radius
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                      : 'bg-white/10 hover:bg-white/15 text-slate-300'
-                  }`}
-                >
-                  {formatShort(p)}
-                </button>
-              ))}
-            </div>
-
-            <input
-              type="range" min={100} max={5000} step={50} value={radius}
-              onChange={(e) => setRadius(+e.target.value)}
-              className="w-full accent-indigo-500 mb-4 cursor-pointer"
-            />
-
-            <button
-              onClick={onStart}
-              disabled={!hasDestination}
-              className="w-full rounded-2xl py-4 font-bold text-white bg-gradient-to-r from-indigo-500 to-fuchsia-600 shadow-lg shadow-indigo-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition active:scale-[.99]"
-            >
-              ▶ Démarrer le suivi du trajet
-            </button>
-          </div>
-        ) : (
-          <div>
-            <div className="text-xs text-slate-400 font-bold tracking-widest uppercase">Distance restante</div>
-            <div className="text-5xl font-black tracking-tight mt-1 text-cyan-400 font-mono">
-              {formatDistance(distance)}
-            </div>
-            <div className="text-xs text-slate-400 mt-2">
-              Zone d'alerte configurée à {formatDistance(radius)}
-            </div>
-
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={onMute}
-                className="flex-1 rounded-2xl py-3.5 text-sm font-bold bg-white/10 hover:bg-white/15 transition"
-              >
-                {muted ? '🔔 Réactiver' : '🔕 Couper son'}
-              </button>
-              <button
-                onClick={onStop}
-                className="flex-[2] rounded-2xl py-3.5 font-bold text-white bg-red-600 hover:bg-red-500 active:scale-[.99] transition shadow-lg shadow-red-600/40"
-              >
-                ■ Arrêter le suivi
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-</script>
-
-<script type="text/plain" id="file-app">
-// src/App.jsx — Application principale 100% front-end
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+<script type="text/plain" id="file-app">// src/App.jsx — App principale 100% front-end (Google Maps + Unity Ads)
+import { useState, useEffect, useRef } from 'react';
 import MapComponent from './components/MapComponent';
 import AlertControl from './components/AlertControl';
-import { haversineDistance, calculateBearing, compassLabel } from './utils/geo';
-import { initUnityAds, showInterstitial } from './utils/unityAds';
+import { haversineDistance, calculateBearing } from './utils/geo';
+import { initUnityAds, showInterstitial, showBanner } from './utils/unityAds';
 
-/** Synthétiseur d'alarme via Web Audio API (aucun fichier audio requis). */
-function useAlarmSynthesizer() {
-  const ctxRef = useRef(null);
-  const timerRef = useRef(null);
+export default function App(){
+  const [userPos,setUserPos]=useState(null);
+  const [destPos,setDestPos]=useState(null);
+  const [radius,setRadius]=useState(500);
+  const [tracking,setTracking]=useState(false);
+  const [distance,setDistance]=useState(null);
+  const [alarm,setAlarm]=useState(false);
+  const watchId=useRef(null);
 
-  const beep = useCallback((freq, dur = 0.4, type = 'sawtooth', vol = 0.3, when = 0) => {
-    try {
-      if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = ctxRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
-      const t = ctx.currentTime + when;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(vol, t + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + dur + 0.05);
-    } catch (err) { /* audio non autorisé : on continue */ }
-  }, []);
+  useEffect(()=>{ initUnityAds(); showBanner(); // bannière BP_Banner_Android
+    navigator.geolocation?.getCurrentPosition(p=>setUserPos({lat:p.coords.latitude,lng:p.coords.longitude}));
+  },[]);
 
-  const start = useCallback((kind = 'siren') => {
-    stop();
-    let hi = true;
-    if (kind === 'siren') {
-      beep(880, 0.45, 'sawtooth', 0.28);
-      timerRef.current = setInterval(() => { beep(hi ? 620 : 880, 0.45, 'sawtooth', 0.28); hi = !hi; }, 500);
-    } else if (kind === 'urgent') {
-      const tick = () => { beep(1046, 0.14, 'square', 0.22, 0); beep(1046, 0.14, 'square', 0.22, 0.2); beep(1046, 0.28, 'square', 0.25, 0.4); };
-      tick();
-      timerRef.current = setInterval(tick, 1100);
-    } else {
-      const tick = () => { beep(523, 0.6, 'sine', 0.35); beep(784, 0.6, 'sine', 0.22, 0.35); };
-      tick();
-      timerRef.current = setInterval(tick, 1400);
-    }
-  }, [beep]);
-
-  const stop = useCallback(() => {
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-  }, []);
-
-  return { start, stop, beep };
-}
-
-export default function App() {
-  const [userPos, setUserPos] = useState(null);
-  const [accuracy, setAccuracy] = useState(null);
-  const [speed, setSpeed] = useState(null);
-  const [destPos, setDestPos] = useState(null);
-  const [radius, setRadius] = useState(500);
-  const [tracking, setTracking] = useState(false);
-  const [distance, setDistance] = useState(null);
-  const [alarm, setAlarm] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [bearing, setBearing] = useState(0);
-
-  const watchId = useRef(null);
-  const alarmSound = useAlarmSynthesizer();
-
-  // ── Initialisation : SDK publicitaire + position initiale ──
-  useEffect(() => {
-    initUnityAds();
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setAccuracy(pos.coords.accuracy);
-      },
-      (err) => console.warn('GPS initial indisponible :', err.message),
-      { enableHighAccuracy: true, timeout: 12000 }
-    );
-  }, []);
-
-  // ── Calcul Haversine temps réel + déclenchement de l'alarme ──
-  useEffect(() => {
-    if (!userPos || !destPos) return;
-    const d = haversineDistance(userPos, destPos);
+  useEffect(()=>{
+    if(!userPos||!destPos) return;
+    const d=haversineDistance(userPos,destPos);
     setDistance(d);
-    setBearing(calculateBearing(userPos, destPos));
-
-    if (tracking && d != null && d <= radius && !alarm && !muted) {
+    if(tracking && d!=null && d<=radius && !alarm){
       setAlarm(true);
-      alarmSound.start('siren');
-      if ('vibrate' in navigator) navigator.vibrate([500, 200, 500, 200, 800]);
+      if('vibrate' in navigator) navigator.vibrate([500,200,500,200,800]);
     }
-  }, [userPos, destPos, tracking, radius, alarm, muted, alarmSound]);
+  },[userPos,destPos,tracking,radius,alarm]);
 
-  const startTracking = () => {
-    if (!destPos) return;
-    setTracking(true);
-    setAlarm(false);
-    setMuted(false);
-
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').catch(() => {});
-    }
-    watchId.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setAccuracy(pos.coords.accuracy);
-        if (pos.coords.speed != null && pos.coords.speed >= 0) setSpeed(pos.coords.speed);
-      },
-      (err) => console.warn('GPS watch :', err.message),
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
-    );
+  const startTracking=()=>{
+    if(!destPos) return; setTracking(true); setAlarm(false);
+    watchId.current=navigator.geolocation.watchPosition(p=>{
+      setUserPos({lat:p.coords.latitude,lng:p.coords.longitude});
+    }, console.warn, {enableHighAccuracy:true, maximumAge:1000});
   };
-
-  const stopTracking = () => {
-    setTracking(false);
-    setAlarm(false);
-    alarmSound.stop();
-    if ('vibrate' in navigator) navigator.vibrate(0);
-    if (watchId.current != null) {
-      navigator.geolocation.clearWatch(watchId.current);
-      watchId.current = null;
-    }
-    // Interstitiel de fin de trajet — jamais pendant un suivi actif
-    setTimeout(() => showInterstitial('journey_ended', false), 900);
+  const stopTracking=()=>{
+    setTracking(false); setAlarm(false);
+    if(watchId.current!=null) navigator.geolocation.clearWatch(watchId.current);
+    setTimeout(()=>showInterstitial('journey_ended', false), 900); // BP_Interstitial_Android
   };
-
-  const heading = compassLabel(bearing);
 
   return (
-    <div className="h-screen w-screen relative overflow-hidden bg-slate-950 font-sans">
-      <MapComponent
-        userPos={userPos}
-        destPos={destPos}
-        radius={radius}
-        onSelectDest={setDestPos}
-        tracking={tracking}
-        dark
-      />
-      <AlertControl
-        radius={radius}
-        setRadius={setRadius}
-        tracking={tracking}
-        distance={distance}
-        alarm={alarm}
-        hasDestination={!!destPos}
-        onStart={startTracking}
-        onStop={stopTracking}
-        onMute={() => { setMuted(true); setAlarm(false); alarmSound.stop(); }}
-        muted={muted}
-      />
-      {/* Indicateur de cap */}
-      <div className="absolute top-4 right-4 z-[1000] bg-slate-900/80 backdrop-blur rounded-2xl px-4 py-2 text-white text-xs font-bold">
-        {tracking ? `Cap : ${heading} · ${speed ? (speed * 3.6).toFixed(0) : 0} km/h` : 'Prêt'}
-        {accuracy ? ` · GPS ±${Math.round(accuracy)} m` : ''}
-      </div>
+    <div className="h-screen w-screen relative overflow-hidden">
+      <MapComponent userPos={userPos} destPos={destPos} radius={radius} onSelectDest={setDestPos} />
+      <AlertControl radius={radius} setRadius={setRadius} tracking={tracking} distance={distance} alarm={alarm} hasDestination={!!destPos} onStart={startTracking} onStop={stopTracking} />
     </div>
   );
 }
 </script>
 
-<!-- ================= LEAFLET ================= -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Pont Unity Ads (WebView Android / SDK web) -->
 <script src="https://web.unityads.unity3d.com/sdk/UnityAdsWeb.js" async onerror="window.__unitySdkMissing=true"></script>
-
 <script>
-/* ==========================================================================
-   ARRIVA — Runtime single-file
-   Vanilla JS équivalent de l'architecture React décrite dans le modal « Code ».
-   Aucune base de données : tout l'état vit en mémoire côté client.
-   ========================================================================== */
-(function () {
-  'use strict';
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+var isMobile = function(){ return window.innerWidth < 768; };
+var EARTH_RADIUS_M = 6371000;
+var toRad = function(d){ return d*Math.PI/180; };
+function haversineDistance(from,to){
+  if(!from||!to) return null;
+  var dLat=toRad(to.lat-from.lat), dLng=toRad(to.lng-from.lng);
+  var a=Math.pow(Math.sin(dLat/2),2)+Math.cos(toRad(from.lat))*Math.cos(toRad(to.lat))*Math.pow(Math.sin(dLng/2),2);
+  return 2*EARTH_RADIUS_M*Math.asin(Math.sqrt(a));
+}
+function calculateBearing(from,to){
+  if(!from||!to) return 0;
+  var dLng=toRad(to.lng-from.lng);
+  var y=Math.sin(dLng)*Math.cos(toRad(to.lat));
+  var x=Math.cos(toRad(from.lat))*Math.sin(toRad(to.lat))-Math.sin(toRad(from.lat))*Math.cos(toRad(to.lat))*Math.cos(dLng);
+  return ((Math.atan2(y,x)*180)/Math.PI+360)%360;
+}
+function formatDistance(m){ if(m==null) return '—'; if(m<1000) return Math.round(m)+' m'; if(m<10000) return (m/1000).toFixed(2)+' km'; return (m/1000).toFixed(1)+' km'; }
+function formatShort(m){ if(m==null) return '—'; if(m<1000) return Math.round(m)+'m'; return (m/1000).toFixed(m<10000?2:1)+'km'; }
+function compassLabel(deg){ var dirs=['N','NE','E','SE','S','SO','O','NO']; return dirs[Math.round(deg/45)%8]; }
+function moveTowards(from,to,meters){ var dist=haversineDistance(from,to); if(!dist) return {lat:to.lat,lng:to.lng}; var f=Math.min(1,meters/dist); return {lat:from.lat+(to.lat-from.lat)*f,lng:from.lng+(to.lng-from.lng)*f}; }
 
-  const $ = (id) => document.getElementById(id);
-  const isMobile = () => window.innerWidth < 768;
+var S={
+  user:null, accuracy:null, speed:null, dest:null, destName:'', radius:500,
+  tracking:false, watchId:null, demoTimer:null, elapsedTimer:null,
+  alarmActive:false, muted:false, alarmType:'siren', vibration:true, demo:false,
+  initialDistance:null, startTime:null, wakeLock:null, recent:[], sheetCollapsed:false, lastFix:0
+};
 
-  /* ------------------------------------------------------------------ */
-  /* 1. UTILITAIRES GÉODÉSIQUES (équivalent src/utils/geo.js)            */
-  /* ------------------------------------------------------------------ */
-  const EARTH_RADIUS_M = 6371000;
-  const toRad = (d) => (d * Math.PI) / 180;
+var TOAST_STYLES={info:{border:'border-indigo-500/40',icon:'💡'},success:{border:'border-green-500/50',icon:'✅'},warn:{border:'border-amber-500/50',icon:'⚠️'},error:{border:'border-red-500/50',icon:'❌'}};
+function toast(msg,type){
+  var conf=TOAST_STYLES[type]||TOAST_STYLES.info;
+  var el=document.createElement('div');
+  el.className='toast glass rounded-2xl px-4 py-3 text-[13px] font-bold border pointer-events-auto shadow-2xl flex items-center gap-2.5 '+conf.border;
+  el.innerHTML='<span>'+conf.icon+'</span><span>'+msg+'</span>';
+  $('toasts').appendChild(el);
+  setTimeout(function(){ el.classList.add('out'); setTimeout(function(){ el.remove(); },320); },3600);
+}
 
-  function haversineDistance(from, to) {
-    if (!from || !to) return null;
-    const dLat = toRad(to.lat - from.lat);
-    const dLng = toRad(to.lng - from.lng);
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLng / 2) ** 2;
-    return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a));
-  }
+// --- GOOGLE MAPS STYLE TILES (CARTO Voyager) ---
+var GOOGLE_TILES_URL = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_48if_1_e850e696c73ebaf5c2079f48';
+var GOOGLE_TILES_FALLBACK = 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_48if_2_0f3fe5e8cce7bab4ee01bfc8';
 
-  function calculateBearing(from, to) {
-    if (!from || !to) return 0;
-    const dLng = toRad(to.lng - from.lng);
-    const y = Math.sin(dLng) * Math.cos(toRad(to.lat));
-    const x = Math.cos(toRad(from.lat)) * Math.sin(toRad(to.lat)) -
-      Math.sin(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.cos(dLng);
-    return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-  }
+var map=null, tiles=null;
+var userMarker=null, destMarker=null, radiusCircle=null, accuracyCircle=null, routeLine=null;
+var userIcon=L.divIcon({className:'', html:'<div class="user-wrap"><div class="user-radar"></div><div class="user-pulse-ring"></div><div class="user-dot"></div></div>', iconSize:[28,28], iconAnchor:[14,14]});
+var destIcon=L.divIcon({className:'', html:'<div class="dest-pin-wrap"><div class="dest-pin pin-bounce"><svg viewBox="0 0 44 52"><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30s22-14 22-30C44 10 34 0 22 0z" fill="#ff2d55"/><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30V0z" fill="#e11d48"/><circle cx="22" cy="21" r="9" fill="#fff"/><circle cx="22" cy="21" r="4.5" fill="#ff2d55"/></svg></div></div>', iconSize:[44,52], iconAnchor:[22,50]});
 
-  function formatDistance(m) {
-    if (m == null) return '—';
-    if (m < 1000) return Math.round(m) + ' m';
-    if (m < 10000) return (m / 1000).toFixed(2) + ' km';
-    return (m / 1000).toFixed(1) + ' km';
-  }
-
-  function formatShort(m) {
-    if (m == null) return '—';
-    if (m < 1000) return Math.round(m) + 'm';
-    return (m / 1000).toFixed(m < 10000 ? 2 : 1) + 'km';
-  }
-
-  function compassLabel(deg) {
-    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
-    return dirs[Math.round(deg / 45) % 8];
-  }
-
-  function moveTowards(from, to, meters) {
-    const dist = haversineDistance(from, to);
-    if (!dist) return Object.assign({}, to);
-    const f = Math.min(1, meters / dist);
-    return { lat: from.lat + (to.lat - from.lat) * f, lng: from.lng + (to.lng - from.lng) * f };
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* 2. ÉTAT GLOBAL (équivalent useState d'App.jsx)                     */
-  /* ------------------------------------------------------------------ */
-  const S = {
-    user: null, accuracy: null, speed: null,
-    dest: null, destName: '', radius: 500,
-    tracking: false, watchId: null, demoTimer: null,
-    alarmActive: false, alarmMuted: false, muted: false,
-    alarmType: 'siren', vibration: true, demo: false,
-    initialDistance: null, startTime: null, elapsed: null,
-    wakeLock: null, recent: []
-  };
-
-  /* ------------------------------------------------------------------ */
-  /* 3. TOASTS                                                          */
-  /* ------------------------------------------------------------------ */
-  const TOAST_STYLES = {
-    info:    { border: 'border-indigo-500/40', icon: '💡' },
-    success: { border: 'border-green-500/50',  icon: '✅' },
-    warn:    { border: 'border-amber-500/50',  icon: '⚠️' },
-    error:   { border: 'border-red-500/50',    icon: '❌' }
-  };
-
-  function toast(msg, type) {
-    const conf = TOAST_STYLES[type] || TOAST_STYLES.info;
-    const el = document.createElement('div');
-    el.className = 'toast glass rounded-2xl px-4 py-3 text-[13px] font-bold border pointer-events-auto shadow-2xl flex items-center gap-2.5 ' + conf.border;
-    el.innerHTML = '<span>' + conf.icon + '</span><span>' + msg + '</span>';
-    $('toasts').appendChild(el);
-    setTimeout(() => {
-      el.classList.add('out');
-      setTimeout(() => el.remove(), 320);
-    }, 3600);
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* 4. CARTE LEAFLET                                                   */
-  /* ------------------------------------------------------------------ */
-  const TILES = {
-    dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-  };
-
-  let map = null, tiles = null;
-  let userMarker = null, destMarker = null, radiusCircle = null, accuracyCircle = null, routeLine = null;
-
-  const userIcon = L.divIcon({
-    className: '',
-    html: '<div class="user-wrap"><div class="user-radar"></div><div class="user-pulse-ring"></div><div class="user-dot"></div></div>',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
+function initMap(){
+  map=L.map('map',{zoomControl:false, attributionControl:true}).setView([48.8566,2.3522],13);
+  tiles=L.tileLayer(GOOGLE_TILES_URL, {maxZoom:19, attribution:'&copy; OpenStreetMap &copy; CARTO — Google Maps style (Voyager)', subdomains:'abcd'}).addTo(map);
+  tiles.on('tileerror', function(){ /* fallback silencieuse si clé 1 invalide */ });
+  map.attributionControl.setPrefix('ARRIVA • Google Maps Voyager');
+  map.on('click', function(e){
+    setDestination({lat:e.latlng.lat,lng:e.latlng.lng});
+    reverseGeocode(e.latlng.lat,e.latlng.lng);
+    if(isMobile()) collapseSheet(true);
   });
+  $('mapBadge').classList.remove('hidden'); $('mapBadge').classList.add('flex');
+  setTimeout(function(){ map.invalidateSize(); },320);
+  window.addEventListener('resize', function(){ if(map) map.invalidateSize(); });
+}
+function updateUserLayer(){
+  if(!map||!S.user) return;
+  if(!userMarker){ userMarker=L.marker([S.user.lat,S.user.lng],{icon:userIcon,zIndexOffset:1000}).addTo(map); }
+  else { userMarker.setLatLng([S.user.lat,S.user.lng]); }
+  if(S.accuracy){
+    if(!accuracyCircle){ accuracyCircle=L.circle([S.user.lat,S.user.lng],{radius:S.accuracy,color:'#22d3ee',weight:1,opacity:0.5,fillColor:'#22d3ee',fillOpacity:0.08}).addTo(map); }
+    else { accuracyCircle.setLatLng([S.user.lat,S.user.lng]).setRadius(S.accuracy); }
+  }
+  updateRouteLine();
+}
+function updateDestLayer(){
+  if(!map) return;
+  if(destMarker){ map.removeLayer(destMarker); destMarker=null; }
+  if(radiusCircle){ map.removeLayer(radiusCircle); radiusCircle=null; }
+  if(S.dest){
+    destMarker=L.marker([S.dest.lat,S.dest.lng],{icon:destIcon,draggable:true}).addTo(map);
+    destMarker.on('dragend', function(){ var p=destMarker.getLatLng(); setDestination({lat:p.lat,lng:p.lng},true); reverseGeocode(p.lat,p.lng); });
+    radiusCircle=L.circle([S.dest.lat,S.dest.lng],{radius:S.radius,color:'#ff2d55',weight:2.5,opacity:0.9,dashArray:'10 7',fillColor:'#ff2d55',fillOpacity:0.12}).addTo(map);
+  }
+  updateRouteLine();
+}
+function updateRouteLine(){
+  if(!map) return;
+  if(routeLine){ map.removeLayer(routeLine); routeLine=null; }
+  if(S.user&&S.dest){
+    routeLine=L.polyline([[S.user.lat,S.user.lng],[S.dest.lat,S.dest.lng]],{color:'#22d3ee',weight:3,opacity:0.75,dashArray:'8 10',lineCap:'round'}).addTo(map);
+  }
+}
+function fitBoth(){ if(!map||!S.user||!S.dest) return; var b=L.latLngBounds([[S.user.lat,S.user.lng],[S.dest.lat,S.dest.lng]]); map.fitBounds(b,{padding:[90,90],maxZoom:16,animate:true}); }
 
-  const destIcon = L.divIcon({
-    className: '',
-    html: '<div class="dest-pin-wrap"><div class="dest-pin pin-bounce">' +
-          '<svg viewBox="0 0 44 52">' +
-          '<path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30s22-14 22-30C44 10 34 0 22 0z" fill="#ff2d55"/>' +
-          '<path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30V0z" fill="#e11d48"/>' +
-          '<circle cx="22" cy="21" r="9" fill="#fff"/>' +
-          '<circle cx="22" cy="21" r="4.5" fill="#ff2d55"/>' +
-          '</svg></div></div>',
-    iconSize: [44, 52],
-    iconAnchor: [22, 50]
+function setGpsBadge(status,text){
+  var dot=$('gpsDot');
+  dot.className='w-2 h-2 rounded-full '+(status==='ok'?'bg-green-400':status==='warn'?'bg-amber-400 animate-pulse':'bg-slate-400 animate-pulse');
+  $('gpsText').textContent=text;
+}
+function requestLocation(center){
+  if(!('geolocation' in navigator)){ setGpsBadge('err','GPS non supporté'); toast('Géolocalisation non supportée','error'); return; }
+  setGpsBadge('warn','Localisation…');
+  navigator.geolocation.getCurrentPosition(function(pos){ applyPosition(pos, center!==false); toast('Signal GPS acquis • Carte Google Maps prête','success'); },
+  function(err){ console.warn(err); setGpsBadge('err','GPS indisponible'); toast('GPS indisponible — activez-le ou utilisez le mode démo','warn'); if(map) map.setView([48.8566,2.3522],13); updateStartButton(); },
+  {enableHighAccuracy:true, timeout:12000, maximumAge:5000});
+}
+function applyPosition(pos,center){
+  S.user={lat:pos.coords.latitude,lng:pos.coords.longitude};
+  S.accuracy=pos.coords.accuracy||null;
+  if(pos.coords.speed!=null && pos.coords.speed>=0) S.speed=pos.coords.speed;
+  S.lastFix=Date.now();
+  updateUserLayer();
+  setGpsBadge('ok','GPS ±'+Math.round(S.accuracy||15)+'m');
+  $('trackAccuracy').textContent='GPS ±'+Math.round(S.accuracy||15)+'m';
+  if(center && map) map.flyTo([S.user.lat,S.user.lng],15,{duration:1.1});
+  refreshDistances(); updateStartButton();
+}
+
+function setDestination(latlng,keepName){
+  S.dest={lat:+(+(latlng.lat)).toFixed(6), lng:+(+(latlng.lng)).toFixed(6)};
+  if(!keepName){ S.destName='Épingle personnalisée'; $('destName').textContent=S.destName; $('alarmDest').textContent='📍 Épingle personnalisée'; }
+  $('noDestCard').classList.add('hidden'); $('destCard').classList.remove('hidden');
+  $('destCoords').textContent=S.dest.lat.toFixed(5)+', '+S.dest.lng.toFixed(5);
+  $('destBadge').classList.remove('hidden'); $('destBadge').classList.add('flex');
+  $('destBadgeText').textContent=S.destName.length>28?S.destName.slice(0,28)+'…':S.destName;
+  $('fitBtn').classList.remove('hidden'); $('fitBtn').classList.add('flex');
+  $('miniCompass').classList.remove('hidden');
+  updateDestLayer(); refreshDistances(); updateStartButton();
+  if(S.tracking && S.initialDistance==null && S.user){ S.initialDistance=haversineDistance(S.user,S.dest); }
+}
+function clearDestination(){
+  S.dest=null; S.destName='';
+  $('noDestCard').classList.remove('hidden'); $('destCard').classList.add('hidden');
+  $('destBadge').classList.add('hidden'); $('destBadge').classList.remove('flex');
+  $('fitBtn').classList.add('hidden'); $('fitBtn').classList.remove('flex');
+  $('miniCompass').classList.add('hidden');
+  updateDestLayer(); updateStartButton();
+}
+function reverseGeocode(lat,lng){
+  fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json&accept-language=fr&zoom=16')
+  .then(function(r){ return r.json(); })
+  .then(function(j){
+    if(!j||!j.display_name) return;
+    var short=(j.display_name||'').split(',').slice(0,2).join(',').trim();
+    if(!short) return;
+    S.destName=short; $('destName').textContent=short; $('alarmDest').textContent='📍 '+short; $('destBadgeText').textContent=short.length>28?short.slice(0,28)+'…':short;
+  }).catch(function(){});
+}
+function pushRecent(name,pos){
+  if(!name||!pos) return;
+  S.recent=[{name:name,pos:{lat:pos.lat,lng:pos.lng}}].concat(S.recent.filter(function(r){ return r.name!==name; })).slice(0,6);
+  renderRecent();
+}
+function renderRecent(){
+  var wrap=$('recentWrap'), list=$('recentList');
+  if(!S.recent.length){ wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden'); list.innerHTML='';
+  S.recent.forEach(function(r){
+    var b=document.createElement('button');
+    b.className='shrink-0 chip rounded-full px-3 py-1.5 text-[11px] font-bold whitespace-nowrap hover:bg-indigo-500/20 transition';
+    b.textContent='📍 '+(r.name.length>22?r.name.slice(0,22)+'…':r.name);
+    b.onclick=function(){ setDestination(r.pos,true); S.destName=r.name; $('destName').textContent=r.name; $('alarmDest').textContent='📍 '+r.name; $('destBadgeText').textContent=r.name; if(map) map.flyTo([r.pos.lat,r.pos.lng],15,{duration:1}); toast('Destination : '+r.name,'success'); };
+    list.appendChild(b);
   });
+}
+function refreshDistances(){
+  if(!S.user||!S.dest) return null;
+  var d=haversineDistance(S.user,S.dest);
+  $('destDirectDist').textContent=formatDistance(d)+" à vol d'oiseau";
+  var bearing=calculateBearing(S.user,S.dest);
+  $('compassArrow').style.transform='rotate('+bearing.toFixed(0)+'deg)';
+  $('panelArrow').style.transform='rotate('+bearing.toFixed(0)+'deg)';
+  $('compassDist').textContent=formatShort(d);
+  $('statCap').textContent=compassLabel(bearing);
+  $('headingText').textContent='Direction : '+compassLabel(bearing)+' ('+Math.round(bearing)+'°)';
+  if(S.tracking) updateTrackingUI(d);
+  checkAlarm(d);
+  return d;
+}
 
-  function initMap() {
-    map = L.map('map', { zoomControl: false, attributionControl: true }).setView([48.8566, 2.3522], 13);
-    const dark = document.documentElement.getAttribute('data-theme') !== 'light';
-    tiles = L.tileLayer(dark ? TILES.dark : TILES.light, {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap &copy; CARTO'
-    }).addTo(map);
-    map.attributionControl.setPrefix('ARRIVA');
-
-    map.on('click', (e) => {
-      setDestination({ lat: e.latlng.lat, lng: e.latlng.lng });
-      reverseGeocode(e.latlng.lat, e.latlng.lng);
-      if (isMobile()) collapseSheet(true);
-    });
-
-    setTimeout(() => map.invalidateSize(), 300);
-    window.addEventListener('resize', () => map && map.invalidateSize());
-  }
-
-  function swapTiles() {
-    if (!map) return;
-    const dark = document.documentElement.getAttribute('data-theme') !== 'light';
-    if (tiles) map.removeLayer(tiles);
-    tiles = L.tileLayer(dark ? TILES.dark : TILES.light, {
-      maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
-    }).addTo(map);
-  }
-
-  function updateUserLayer() {
-    if (!map || !S.user) return;
-    if (!userMarker) {
-      userMarker = L.marker([S.user.lat, S.user.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
-    } else {
-      userMarker.setLatLng([S.user.lat, S.user.lng]);
-    }
-    if (S.accuracy) {
-      if (!accuracyCircle) {
-        accuracyCircle = L.circle([S.user.lat, S.user.lng], {
-          radius: S.accuracy, color: '#22d3ee', weight: 1, opacity: 0.5,
-          fillColor: '#22d3ee', fillOpacity: 0.08
-        }).addTo(map);
-      } else {
-        accuracyCircle.setLatLng([S.user.lat, S.user.lng]).setRadius(S.accuracy);
-      }
-    }
-    updateRouteLine();
-  }
-
-  function updateDestLayer() {
-    if (!map) return;
-    if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
-    if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
-
-    if (S.dest) {
-      destMarker = L.marker([S.dest.lat, S.dest.lng], { icon: destIcon, draggable: true }).addTo(map);
-      destMarker.on('dragend', () => {
-        const p = destMarker.getLatLng();
-        setDestination({ lat: p.lat, lng: p.lng }, true);
-        reverseGeocode(p.lat, p.lng);
+var searchTimeout=null;
+$('searchInput').addEventListener('input', function(e){
+  var q=e.target.value.trim();
+  $('searchClear').classList.toggle('hidden',!q); $('searchClear').classList.toggle('flex',!!q);
+  clearTimeout(searchTimeout);
+  if(q.length<3){ $('searchResults').classList.add('hidden'); return; }
+  searchTimeout=setTimeout(function(){ doSearch(q); },450);
+});
+function doSearch(q){
+  $('searchSpinner').classList.remove('hidden');
+  fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=6&accept-language=fr&addressdetails=1')
+  .then(function(r){ return r.json(); })
+  .then(function(arr){
+    var box=$('searchResults'); box.innerHTML='';
+    if(!arr||!arr.length){ box.innerHTML='<div class="p-4 text-[13px] text-dim font-semibold text-center">Aucun résultat pour « '+q+' »</div>'; }
+    else{
+      arr.forEach(function(place){
+        var item=document.createElement('button');
+        item.className='search-item w-full text-left px-4 py-3 border-b last:border-0 flex gap-3 items-start';
+        item.style.borderColor='var(--border)';
+        var short=(place.display_name||'').split(',').slice(0,2).join(',');
+        item.innerHTML='<div class="w-8 h-8 rounded-lg bg-[#ff2d55]/15 border border-[#ff2d55]/30 flex items-center justify-center shrink-0 text-[14px]">📍</div><div class="min-w-0"><div class="text-[13px] font-bold truncate" style="color:var(--text)">'+short+'</div><div class="text-[11px] text-dim truncate">'+(place.display_name||'')+'</div><div class="text-[10px] font-mono text-dim">'+(+place.lat).toFixed(4)+', '+(+place.lon).toFixed(4)+'</div></div>';
+        item.onclick=function(){
+          var pos={lat:+place.lat,lng:+place.lon};
+          setDestination(pos,true);
+          S.destName=short; $('destName').textContent=short; $('alarmDest').textContent='📍 '+short; $('destBadgeText').textContent=short.length>28?short.slice(0,28)+'…':short;
+          pushRecent(short,pos);
+          if(map) map.flyTo([pos.lat,pos.lng],15,{duration:1.2});
+          box.classList.add('hidden'); $('searchInput').value=short;
+          toast('Destination définie : '+short,'success');
+          if(isMobile()) collapseSheet(true);
+        };
+        box.appendChild(item);
       });
-      radiusCircle = L.circle([S.dest.lat, S.dest.lng], {
-        radius: S.radius, color: '#ff2d55', weight: 2.5, opacity: 0.9,
-        dashArray: '10 7', fillColor: '#ff2d55', fillOpacity: 0.12
-      }).addTo(map);
     }
-    updateRouteLine();
+    box.classList.remove('hidden');
+  }).catch(function(){ toast('Recherche indisponible','error'); })
+  .then(function(){ $('searchSpinner').classList.add('hidden'); });
+}
+$('searchClear').onclick=function(){ $('searchInput').value=''; $('searchResults').classList.add('hidden'); $('searchClear').classList.add('hidden'); $('searchClear').classList.remove('flex'); };
+document.addEventListener('click', function(e){ if(!e.target.closest('#searchInput') && !e.target.closest('#searchResults') && !e.target.closest('#searchClear')){ $('searchResults').classList.add('hidden'); } });
+
+function setRadius(v){
+  S.radius=+v;
+  $('radiusSlider').value=v; $('radiusSliderLive').value=v;
+  $('radiusBig').textContent=formatDistance(v);
+  $('radiusExplain').textContent=formatDistance(v)+" avant l'arrivée";
+  $('statRadius').textContent=formatShort(v);
+  $('progressTarget').textContent='ALERTE À '+formatShort(v).toUpperCase();
+  document.querySelectorAll('[data-radius]').forEach(function(b){ b.classList.toggle('active', +b.dataset.radius===+v); });
+  if(radiusCircle) radiusCircle.setRadius(+v);
+  if(S.tracking) refreshDistances();
+}
+document.querySelectorAll('[data-radius]').forEach(function(b){ b.addEventListener('click', function(){ setRadius(b.dataset.radius); }); });
+$('radiusSlider').addEventListener('input', function(e){ setRadius(e.target.value); });
+$('radiusSliderLive').addEventListener('input', function(e){ setRadius(e.target.value); });
+
+var audioCtx=null, alarmTimer=null, testTimer=null, vibTimer=null;
+function ensureAudio(){
+  if(!audioCtx){ var Ctx=window.AudioContext||window.webkitAudioContext; if(!Ctx) return null; audioCtx=new Ctx(); }
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+function beep(freq,dur,type,vol,when){
+  freq=freq||880; dur=dur||0.35; type=type||'sine'; vol=vol||0.4; when=when||0;
+  try{ var ctx=ensureAudio(); if(!ctx) return; var t=ctx.currentTime+when; var o=ctx.createOscillator(), g=ctx.createGain(); o.type=type; o.frequency.setValueAtTime(freq,t); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+dur+0.06); }catch(e){}
+}
+function startAlarmLoop(kind){
+  stopAlarmLoop(); ensureAudio(); var hi=true;
+  if(kind==='urgent'){
+    var tickU=function(){ beep(1046,0.14,'square',0.22,0); beep(1046,0.14,'square',0.22,0.2); beep(1046,0.28,'square',0.25,0.4); };
+    tickU(); alarmTimer=setInterval(tickU,1100);
+  } else if(kind==='soft'){
+    var tickS=function(){ beep(523,0.6,'sine',0.35); beep(784,0.6,'sine',0.22,0.35); };
+    tickS(); alarmTimer=setInterval(tickS,1400);
+  } else {
+    var tick=function(){ beep(hi?880:620,0.45,'sawtooth',0.28); hi=!hi; };
+    tick(); alarmTimer=setInterval(tick,500);
   }
+}
+function stopAlarmLoop(){ if(alarmTimer){ clearInterval(alarmTimer); alarmTimer=null; } }
+function startVibrationLoop(){
+  stopVibration(); if(!S.vibration||!('vibrate' in navigator)) return;
+  var pattern=[500,200,500,200,800]; try{ navigator.vibrate(pattern); }catch(e){}
+  vibTimer=setInterval(function(){ try{ navigator.vibrate(pattern); }catch(e){} },2200);
+}
+function stopVibration(){ if(vibTimer){ clearInterval(vibTimer); vibTimer=null; } try{ navigator.vibrate(0); }catch(e){} }
+document.querySelectorAll('[data-alarm]').forEach(function(b){ b.addEventListener('click', function(){ S.alarmType=b.dataset.alarm; document.querySelectorAll('[data-alarm]').forEach(function(x){ x.classList.toggle('active', x===b); }); }); });
+$('testSoundBtn').addEventListener('click', function(){
+  if(testTimer){ clearTimeout(testTimer); testTimer=null; stopAlarmLoop(); $('testEQ').classList.add('hidden'); $('testSoundIcon').textContent='▶'; return; }
+  startAlarmLoop(S.alarmType); $('testEQ').classList.remove('hidden'); $('testSoundIcon').textContent='⏹';
+  testTimer=setTimeout(function(){ stopAlarmLoop(); testTimer=null; $('testEQ').classList.add('hidden'); $('testSoundIcon').textContent='▶'; },2600);
+});
+$('vibToggle').addEventListener('click', function(e){ e.stopPropagation(); S.vibration=!S.vibration; $('vibToggle').classList.toggle('on',S.vibration); $('vibToggle').setAttribute('aria-checked', String(S.vibration)); if(S.vibration && 'vibrate' in navigator){ try{ navigator.vibrate(80);}catch(_){}} });
+$('demoToggle').addEventListener('click', function(e){ e.stopPropagation(); S.demo=!S.demo; $('demoToggle').classList.toggle('on',S.demo); $('demoToggle').setAttribute('aria-checked', String(S.demo)); toast(S.demo?'Mode démo activé — trajet simulé':'Mode démo désactivé','info'); updateStartButton(); });
 
-  function updateRouteLine() {
-    if (!map) return;
-    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-    if (S.user && S.dest) {
-      routeLine = L.polyline([[S.user.lat, S.user.lng], [S.dest.lat, S.dest.lng]], {
-        color: '#22d3ee', weight: 3, opacity: 0.75, dashArray: '8 10', lineCap: 'round'
-      }).addTo(map);
-    }
+// --- UNITY ADS (Interstitiel + Bannière) ---
+var ADS={
+  gameId:'7ebeaf82-0660-464a-8c58-a299ae5d3091',
+  placementInterstitial:'BP_Interstitial_Android',
+  placementBanner:'BP_Banner_Android',
+  testMode:false,
+  enabled:true,
+  minIntervalMs:20000,
+  maxPerSession:5,
+  skipDelay:5,
+  sessionCount:0,
+  lastShownAt:0,
+  busy:false,
+  bannerVisible:false
+};
+function adsBridge(){
+  if(window.AndroidUnityAds && typeof window.AndroidUnityAds.showInterstitial==='function'){ return {type:'android', api:window.AndroidUnityAds}; }
+  if(window.UnityAds && typeof window.UnityAds.show==='function'){ return {type:'web', api:window.UnityAds}; }
+  return null;
+}
+function initUnityAdsSDK(){
+  var b=adsBridge();
+  try{
+    if(b && b.type==='android' && typeof b.api.init==='function'){ b.api.init(ADS.gameId, ADS.testMode); }
+    else if(b && b.type==='web' && typeof b.api.initialize==='function'){ b.api.initialize(ADS.gameId, ADS.testMode); }
+    if(b && b.type==='android' && typeof b.api.loadBanner==='function'){ try{ b.api.loadBanner(ADS.placementBanner); }catch(_){} }
+  }catch(e){ console.warn('[UnityAds] init',e); }
+  // Afficher la bannière house (fallback) après 1.2s si SDK web absent
+  setTimeout(function(){ if(ADS.enabled) showBannerHouse(); }, 1200);
+}
+function canShowAd(force){
+  if(force) return true;
+  if(!ADS.enabled || ADS.busy) return false;
+  if(ADS.sessionCount>=ADS.maxPerSession) return false;
+  if(Date.now()-ADS.lastShownAt < ADS.minIntervalMs) return false;
+  if(S.tracking && !S.alarmActive) return false;
+  return true;
+}
+function showAd(reason, force){
+  if(!ADS.enabled && !force){ toast('Publicités désactivées','info'); return false; }
+  if(!canShowAd(force)){ if(!force) toast('Publicité non éligible pour le moment (anti-spam)','info'); return false; }
+  var b=adsBridge();
+  if(b){
+    try{
+      if(b.type==='android'){ var shown=b.api.showInterstitial(ADS.placementInterstitial); if(shown!==false){ ADS.sessionCount++; ADS.lastShownAt=Date.now(); updateAdsCount(); return true; } }
+      else { b.api.show(ADS.placementInterstitial); ADS.sessionCount++; ADS.lastShownAt=Date.now(); updateAdsCount(); return true; }
+    }catch(e){ console.warn('[UnityAds] show',e); }
   }
+  renderHouseAd(reason||'app_open'); return true;
+}
+var AD_CREATIVES=[
+  {emoji:'🚆', brand:'SNCF Connect', title:'Voyagez malin dès 19 €', body:'Réservez vos billets TGV, TER et Intercités en 2 minutes. Annulation et échange flexibles.', cta:'Voir les offres', bg:'linear-gradient(135deg,#2563eb,#7c3aed)', btn:'linear-gradient(135deg,#6366f1,#d946ef)'},
+  {emoji:'🎧', brand:'AcousticPro ANC', title:'-40 % sur le casque anti-bruit', body:"Le silence absolu en train et en avion. 40 h d'autonomie et son haute-fidélité immersif.", cta:"Profiter de l'offre", bg:'linear-gradient(135deg,#0ea5e9,#22d3ee)', btn:'linear-gradient(135deg,#06b6d4,#3b82f6)'},
+  {emoji:'☕', brand:'CaféNomade', title:'Votre premier café offert', body:'Commandez depuis le wagon et retirez sans attendre en gare. Plus de 350 points en France.', cta:'En profiter', bg:'linear-gradient(135deg,#f59e0b,#b45309)', btn:'linear-gradient(135deg,#f59e0b,#ef4444)'}
+];
+var BANNER_CREATIVES=[
+  {emoji:'🎧', title:'AcousticPro ANC — -40%', body:'Silence absolu en train • 40h', bg:'linear-gradient(90deg,#0ea5e9,#6366f1)'},
+  {emoji:'🚆', title:'SNCF Connect — Dès 19€', body:'Billets TGV & TER en 2 min', bg:'linear-gradient(90deg,#2563eb,#7c3aed)'},
+  {emoji:'☕', title:'CaféNomade — Offert', body:'Retrait en gare sans attente', bg:'linear-gradient(90deg,#f59e0b,#ec4899)'}
+];
+var adTimer=null, adCloseTimer=null;
+function renderHouseAd(reason){
+  ADS.busy=true;
+  var overlay=$('adOverlay');
+  var c=AD_CREATIVES[Math.floor(Math.random()*AD_CREATIVES.length)];
+  $('adLoading').classList.remove('hidden'); $('adCreative').classList.add('hidden');
+  $('adPlacement').textContent=ADS.placementInterstitial;
+  $('adReason').textContent=reason;
+  var skip=$('adSkipBtn'); skip.disabled=true; skip.textContent='Chargement…';
+  var prog=$('adProgress'); prog.style.transition='none'; prog.style.width='0%';
+  $('adHero').style.background=c.bg; $('adEmoji').textContent=c.emoji; $('adBrand').textContent=c.brand; $('adTitle').textContent=c.title; $('adBody').textContent=c.body; $('adCta').textContent=c.cta; $('adCta').style.background=c.btn;
+  overlay.classList.add('active'); overlay.classList.remove('closing');
+  clearTimeout(adCloseTimer);
+  adCloseTimer=setTimeout(function(){
+    $('adLoading').classList.add('hidden'); $('adCreative').classList.remove('hidden'); startAdCountdown();
+    ADS.sessionCount++; ADS.lastShownAt=Date.now(); updateAdsCount();
+  },750);
+}
+function startAdCountdown(){
+  var t=ADS.skipDelay; var btn=$('adSkipBtn'); var prog=$('adProgress');
+  btn.disabled=true; btn.textContent='Ignorer dans '+t+'s';
+  prog.style.transition='none'; prog.style.width='0%';
+  requestAnimationFrame(function(){ prog.style.transition='width '+ADS.skipDelay+'s linear'; prog.style.width='100%'; });
+  clearInterval(adTimer);
+  adTimer=setInterval(function(){ t--; if(t<=0){ clearInterval(adTimer); adTimer=null; btn.disabled=false; btn.textContent='Ignorer ✕'; } else { btn.textContent='Ignorer dans '+t+'s'; } },1000);
+}
+function closeAd(){
+  var overlay=$('adOverlay'); if(!overlay.classList.contains('active')) return;
+  clearInterval(adTimer); adTimer=null; clearTimeout(adCloseTimer); adCloseTimer=null;
+  overlay.classList.add('closing');
+  setTimeout(function(){ overlay.classList.remove('active','closing'); $('adLoading').classList.remove('hidden'); $('adCreative').classList.add('hidden'); $('adProgress').style.transition='none'; $('adProgress').style.width='0%'; ADS.busy=false; },300);
+}
+function showBannerHouse(){
+  if(!ADS.enabled || ADS.bannerVisible) return;
+  var b=BANNER_CREATIVES[Math.floor(Math.random()*BANNER_CREATIVES.length)];
+  var el=$('bannerAd'); var creative=$('bannerCreative');
+  creative.style.background=b.bg;
+  creative.querySelector('div').textContent=b.emoji;
+  creative.children[1].children[0].textContent=b.title;
+  creative.children[1].children[1].textContent=b.body;
+  el.classList.add('active');
+  ADS.bannerVisible=true;
+  // Essayer SDK natif si dispo
+  var bridge=adsBridge();
+  try{
+    if(bridge && bridge.type==='android' && bridge.api.showBanner) bridge.api.showBanner(ADS.placementBanner);
+    if(bridge && bridge.type==='web' && bridge.api.showBanner) bridge.api.showBanner(ADS.placementBanner);
+  }catch(_){}
+}
+function hideBannerHouse(){
+  $('bannerAd').classList.remove('active'); ADS.bannerVisible=false;
+  var bridge=adsBridge();
+  try{
+    if(bridge && bridge.type==='android' && bridge.api.hideBanner) bridge.api.hideBanner();
+    if(bridge && bridge.type==='web' && bridge.api.hideBanner) bridge.api.hideBanner();
+  }catch(_){}
+}
+function updateAdsCount(){ $('adsCountTxt').textContent='('+ADS.sessionCount+' diffusé'+(ADS.sessionCount>1?'s':'')+')'; }
+$('adSkipBtn').addEventListener('click', closeAd);
+$('adOverlay').addEventListener('click', function(e){ if(!e.target.closest('#adCard') && !$('adSkipBtn').disabled) closeAd(); });
+$('adCta').addEventListener('click', function(){ toast('Action publicitaire enregistrée (démo)','info'); closeAd(); });
+$('adsToggle').addEventListener('click', function(e){
+  e.stopPropagation(); ADS.enabled=!ADS.enabled;
+  $('adsToggle').classList.toggle('on',ADS.enabled);
+  $('adsToggle').setAttribute('aria-checked', String(ADS.enabled));
+  if(ADS.enabled){ showBannerHouse(); toast('Unity Ads activé — Interstitiel + Bannière','info'); } else { hideBannerHouse(); toast('Publicités désactivées','info'); }
+});
+$('testAdBtn').addEventListener('click', function(){ showAd('manual_test', true); });
+$('testBannerBtn').addEventListener('click', function(){
+  if(ADS.bannerVisible){ hideBannerHouse(); setTimeout(showBannerHouse, 350); toast('Bannière Unity rechargée — BP_Banner_Android','info'); }
+  else { showBannerHouse(); toast('Bannière affichée — BP_Banner_Android','success'); }
+});
+$('bannerClose').addEventListener('click', function(){ hideBannerHouse(); toast('Bannière fermée','info'); });
+$('bannerCta').addEventListener('click', function(){ toast('Clic bannière enregistré — ouverture store (démo)','info'); });
 
-  function fitBoth() {
-    if (!map || !S.user || !S.dest) return;
-    const b = L.latLngBounds([[S.user.lat, S.user.lng], [S.dest.lat, S.dest.lng]]);
-    map.fitBounds(b, { padding: [90, 90], maxZoom: 16, animate: true });
+// --- WAKE LOCK + TRACKING ---
+async function requestWakeLock(){
+  if('wakeLock' in navigator){
+    try{ S.wakeLock = await navigator.wakeLock.request('screen'); S.wakeLock.addEventListener('release', function(){ console.log('WakeLock released'); }); $('wakeInfo').classList.remove('hidden'); $('wakeInfo').classList.add('flex'); }catch(e){}
   }
-
-  /* ------------------------------------------------------------------ */
-  /* 5. GÉOLOCALISATION                                                 */
-  /* ------------------------------------------------------------------ */
-  function setGpsBadge(status, text) {
-    const dot = $('gpsDot');
-    dot.className = 'w-2 h-2 rounded-full ' +
-      (status === 'ok' ? 'bg-green-400' : status === 'warn' ? 'bg-amber-400 animate-pulse' : 'bg-slate-400 animate-pulse');
-    $('gpsText').textContent = text;
+}
+function releaseWakeLock(){ if(S.wakeLock){ try{ S.wakeLock.release(); }catch(e){} S.wakeLock=null; } $('wakeInfo').classList.add('hidden'); $('wakeInfo').classList.remove('flex'); }
+function updateTrackingUI(d){
+  var initial=S.initialDistance||d;
+  var progress=initial? Math.max(0, Math.min(100, ((initial - d)/initial)*100)) : 0;
+  $('liveDistance').textContent=formatDistance(d);
+  $('trackingProgress').style.width=progress.toFixed(1)+'%';
+  $('progressPct').textContent=Math.round(progress)+'%';
+  var inside=d<=S.radius;
+  $('insideBadge').classList.toggle('hidden', !inside);
+  $('insideBadge').classList.toggle('flex', inside);
+  $('liveSub').textContent=inside?'📍 Vous êtes dans la zone d\'alerte !':'En route — alerte à '+formatDistance(S.radius);
+  if(S.speed!=null){
+    var kmh=S.speed*3.6;
+    $('statSpeed').textContent=kmh>=10?Math.round(kmh):kmh.toFixed(1);
+    if(d!=null && kmh>2){ var mps=kmh/3.6; var secs=d/mps; var mins=Math.round(secs/60); $('statEta').textContent=mins<60?mins+' min':Math.floor(mins/60)+'h '+(mins%60)+'m'; } else { $('statEta').textContent='—'; }
   }
-
-  function requestLocation(center) {
-    if (!('geolocation' in navigator)) {
-      setGpsBadge('err', 'GPS non supporté');
-      toast('Géolocalisation non supportée par ce navigateur', 'error');
-      return;
-    }
-    setGpsBadge('warn', 'Localisation…');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => { applyPosition(pos, center !== false); toast('Signal GPS acquis', 'success'); },
-      (err) => {
-        console.warn(err);
-        setGpsBadge('err', 'GPS indisponible');
-        toast('GPS indisponible — activez-le ou utilisez le mode démo', 'warn');
-        if (map) map.setView([48.8566, 2.3522], 13);
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
-    );
+  if(d!=null) $('alarmDistance').textContent=formatDistance(d);
+  if(inside){ $('trackingProgress').style.background='linear-gradient(90deg,#ff2d55,#ff7a45)'; } else { $('trackingProgress').style.background='linear-gradient(90deg,#6366f1,#22d3ee)'; }
+}
+function checkAlarm(d){
+  if(!S.tracking || S.muted || d==null) return;
+  if(d<=S.radius && !S.alarmActive){ triggerAlarm(d); }
+}
+function triggerAlarm(d){
+  S.alarmActive=true;
+  $('alarmOverlay').classList.add('active');
+  $('alarmDistance').textContent=formatDistance(d);
+  startAlarmLoop(S.alarmType);
+  startVibrationLoop();
+  // Masquer bannière pendant l'alarme pour maximiser visibilité
+  hideBannerHouse();
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification('ARRIVA — Vous arrivez !', {body:'À '+formatDistance(d)+' de '+S.destName, icon:''}); }catch(e){}
   }
-
-  function applyPosition(pos, center) {
-    S.user = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    S.accuracy = pos.coords.accuracy || null;
-    if (pos.coords.speed != null && pos.coords.speed >= 0) S.speed = pos.coords.speed;
-
-    updateUserLayer();
-    setGpsBadge('ok', 'GPS ±' + Math.round(S.accuracy || 15) + 'm');
-    $('trackAccuracy').textContent = 'GPS ±' + Math.round(S.accuracy || 15) + 'm';
-
-    if (center && map) map.flyTo([S.user.lat, S.user.lng], 15, { duration: 1.1 });
-
-    refreshDistances();
-    updateStartButton();
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* 6. DESTINATION                                                     */
-  /* ------------------------------------------------------------------ */
-  function setDestination(latlng, keepName) {
-    S.dest = { lat: +(+latlng.lat).toFixed(6), lng: +(+latlng.lng).toFixed(6) };
-    if (!keepName) {
-      S.destName = 'Épingle personnalisée';
-      $('destName').textContent = S.destName;
-      $('alarmDest').textContent = '📍 Épingle personnalisée';
-    }
-    $('noDestCard').classList.add('hidden');
-    $('destCard').classList.remove('hidden');
-    $('destCoords').textContent = S.dest.lat.toFixed(5) + ', ' + S.dest.lng.toFixed(5);
-
-    $('destBadge').classList.remove('hidden');
-    $('destBadge').classList.add('flex');
-    $('destBadgeText').textContent = S.destName.length > 28 ? S.destName.slice(0, 28) + '…' : S.destName;
-
-    $('fitBtn').classList.remove('hidden');
-    $('fitBtn').classList.add('flex');
-
-    updateDestLayer();
-    refreshDistances();
-    updateStartButton();
-
-    if (S.tracking && S.initialDistance == null) {
-      S.initialDistance = haversineDistance(S.user, S.dest);
-    }
-  }
-
-  function clearDestination() {
-    S.dest = null;
-    S.destName = '';
-    $('noDestCard').classList.remove('hidden');
-    $('destCard').classList.add('hidden');
-    $('destBadge').classList.add('hidden');
-    $('destBadge').classList.remove('flex');
-    $('fitBtn').classList.add('hidden');
-    $('fitBtn').classList.remove('flex');
-    updateDestLayer();
-    updateStartButton();
-  }
-
-  async function reverseGeocode(lat, lng) {
-    try {
-      const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng +
-        '&format=json&accept-language=fr&zoom=16');
-      const j = await r.json();
-      if (j && j.display_name) {
-        const short = (j.display_name || '').split(',').slice(0, 2).join(',').trim();
-        S.destName = short || 'Destination personnalisée';
-        $('destName').textContent = S.destName;
-        $('alarmDest').textContent = '📍 ' + S.destName;
-        $('destBadgeText').textContent = S.destName.length > 28 ? S.destName.slice(0, 28) + '…' : S.destName;
-      }
-    } catch (e) { /* hors-ligne : on garde « Épingle personnalisée » */ }
-  }
-
-  /* --- Récents --- */
-  function pushRecent(name, pos) {
-    if (!name || !pos) return;
-    S.recent = [{ name: name, pos: Object.assign({}, pos) }]
-      .concat(S.recent.filter((r) => r.name !== name)).slice(0, 6);
-    renderRecent();
-  }
-
-  function renderRecent() {
-    const wrap = $('recentWrap'), list = $('recentList');
-    if (!S.recent.length) { wrap.classList.add('hidden'); return; }
-    wrap.classList.remove('hidden');
-    list.innerHTML = '';
-    S.recent.forEach((r) => {
-      const b = document.createElement('button');
-      b.className = 'shrink-0 chip rounded-full px-3 py-1.5 text-[11px] font-bold whitespace-nowrap hover:bg-indigo-500/20 transition';
-      b.textContent = '📍 ' + (r.name.length > 22 ? r.name.slice(0, 22) + '…' : r.name);
-      b.onclick = () => {
-        setDestination(r.pos, true);
-        S.destName = r.name;
-        $('destName').textContent = r.name;
-        $('alarmDest').textContent = '📍 ' + r.name;
-        $('destBadgeText').textContent = r.name;
-        if (map) map.flyTo([r.pos.lat, r.pos.lng], 15, { duration: 1 });
-        toast('Destination : ' + r.name, 'success');
-      };
-      list.appendChild(b);
-    });
-  }
-
-  /* --- Distances affichées --- */
-  function refreshDistances() {
-    if (!S.user || !S.dest) return null;
-    const d = haversineDistance(S.user, S.dest);
-    $('destDirectDist').textContent = formatDistance(d) + " à vol d'oiseau";
-    if (S.tracking) updateTrackingUI(d);
-    return d;
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* 7. RECHERCHE D'ADRESSE (Nominatim, sans clé API)                   */
-  /* ------------------------------------------------------------------ */
-  let searchTimeout = null;
-
-  $('searchInput').addEventListener('input', (e) => {
-    const q = e.target.value.trim();
-    $('searchClear').classList.toggle('hidden', !q);
-    $('searchClear').classList.toggle('flex', !!q);
-    clearTimeout(searchTimeout);
-    if (q.length < 3) { $('searchResults').classList.add('hidden'); return; }
-    searchTimeout = setTimeout(() => doSearch(q), 450);
-  });
-
-  async function doSearch(q) {
-    $('searchSpinner').classList.remove('hidden');
-    try {
-      const r = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) +
-        '&format=json&limit=6&accept-language=fr&addressdetails=1');
-      const arr = await r.json();
-      const box = $('searchResults');
-      box.innerHTML = '';
-
-      if (!arr.length) {
-        box.innerHTML = '<div class="p-4 text-[13px] text-dim font-semibold text-center">Aucun résultat pour « ' + q + ' »</div>';
-      } else {
-        arr.forEach((place) => {
-          const item = document.createElement('button');
-          item.className = 'search-item w-full text-left px-4 py-3 border-b last:border-0 flex gap-3 items-start';
-          item.style.borderColor = 'var(--border)';
-          const short = (place.display_name || '').split(',').slice(0, 2).join(',');
-          item.innerHTML =
-            '<div class="w-8 h-8 rounded-lg bg-[#ff2d55]/15 border border-[#ff2d55]/30 flex items-center justify-center shrink-0 text-[14px]">📍</div>' +
-            '<div class="min-w-0">' +
-              '<div class="text-[13px] font-bold truncate" style="color:var(--text)">' + short + '</div>' +
-              '<div class="text-[11px] text-dim truncate">' + (place.display_name || '') + '</div>' +
-              '<div class="text-[10px] font-mono text-dim">' + (+place.lat).toFixed(4) + ', ' + (+place.lon).toFixed(4) + '</div>' +
-            '</div>';
-
-          item.onclick = () => {
-            const pos = { lat: +place.lat, lng: +place.lon };
-            setDestination(pos, true);
-            S.destName = short;
-            $('destName').textContent = short;
-            $('alarmDest').textContent = '📍 ' + short;
-            $('destBadgeText').textContent = short.length > 28 ? short.slice(0, 28) + '…' : short;
-            pushRecent(short, pos);
-            if (map) map.flyTo([pos.lat, pos.lng], 15, { duration: 1.2 });
-            box.classList.add('hidden');
-            $('searchInput').value = short;
-            toast('Destination définie : ' + short, 'success');
-            if (isMobile()) collapseSheet(true);
-          };
-          box.appendChild(item);
-        });
-      }
-      box.classList.remove('hidden');
-    } catch (e) {
-      toast('Recherche indisponible (connexion ?)', 'error');
-    } finally {
-      $('searchSpinner').classList.add('hidden');
-    }
-  }
-
-  $('searchClear').onclick = () => {
-    $('searchInput').value = '';
-    $('searchResults').classList.add('hidden');
-    $('searchClear').classList.add('hidden');
-    $('searchClear').classList.remove('flex');
-  };
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('#searchInput') && !e.target.closest('#searchResults') && !e.target.closest('#searchClear')) {
-      $('searchResults').classList.add('hidden');
-    }
-  });
-
-  /* ------------------------------------------------------------------ */
-  /* 8. RAYON D'ALERTE                                                  */
-  /* ------------------------------------------------------------------ */
-  function setRadius(v) {
-    S.radius = +v;
-    $('radiusSlider').value = v;
-    $('radiusSliderLive').value = v;
-    $('radiusBig').textContent = formatDistance(v);
-    $('radiusExplain').textContent = formatDistance(v) + " avant l'arrivée";
-    $('statRadius').textContent = formatShort(v);
-    $('progressTarget').textContent = 'ALERTE À ' + formatShort(v).toUpperCase();
-    document.querySelectorAll('[data-radius]').forEach((b) => {
-      b.classList.toggle('active', +b.dataset.radius === +v);
-    });
-    if (radiusCircle) radiusCircle.setRadius(+v);
-    if (S.tracking) refreshDistances();
-  }
-
-  document.querySelectorAll('[data-radius]').forEach((b) => {
-    b.addEventListener('click', () => setRadius(b.dataset.radius));
-  });
-  $('radiusSlider').addEventListener('input', (e) => setRadius(e.target.value));
-  $('radiusSliderLive').addEventListener('input', (e) => setRadius(e.target.value));
-
-  /* ------------------------------------------------------------------ */
-  /* 9. AUDIO (Web Audio API) + VIBRATION                               */
-  /* ------------------------------------------------------------------ */
-  let audioCtx = null, alarmTimer = null, testTimer = null, vibTimer = null;
-
-  function ensureAudio() {
-    if (!audioCtx) {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return null;
-      audioCtx = new Ctx();
-    }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    return audioCtx;
-  }
-
-  function beep(freq, dur, type, vol, when) {
-    freq = freq || 880; dur = dur || 0.35; type = type || 'sine'; vol = vol || 0.4; when = when || 0;
-    try {
-      const ctx = ensureAudio();
-      if (!ctx) return;
-      const t = ctx.currentTime + when;
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = type;
-      o.frequency.setValueAtTime(freq, t);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(ctx.destination);
-      o.start(t); o.stop(t + dur + 0.06);
-    } catch (e) { /* audio bloqué : on continue silencieusement */ }
-  }
-
-  function startAlarmLoop(kind) {
-    stopAlarmLoop();
-    ensureAudio();
-    let hi = true;
-    if (kind === 'urgent') {
-      const tick = () => { beep(1046, 0.14, 'square', 0.22, 0); beep(1046, 0.14, 'square', 0.22, 0.2); beep(1046, 0.28, 'square', 0.25, 0.4); };
-      tick(); alarmTimer = setInterval(tick, 1100);
-    } else if (kind === 'soft') {
-      const tick = () => { beep(523, 0.6, 'sine', 0.35); beep(784, 0.6, 'sine', 0.22, 0.35); };
-      tick(); alarmTimer = setInterval(tick, 1400);
-    } else {
-      const tick = () => { beep(hi ? 880 : 620, 0.45, 'sawtooth', 0.28); hi = !hi; };
-      tick(); alarmTimer = setInterval(tick, 500);
-    }
-  }
-
-  function stopAlarmLoop() {
-    if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
-  }
-
-  function startVibrationLoop() {
-    stopVibration();
-    if (!S.vibration || !('vibrate' in navigator)) return;
-    const pattern = [500, 200, 500, 200, 800];
-    try { navigator.vibrate(pattern); } catch (e) {}
-    vibTimer = setInterval(() => { try { navigator.vibrate(pattern); } catch (e) {} }, 2200);
-  }
-
-  function stopVibration() {
-    if (vibTimer) { clearInterval(vibTimer); vibTimer = null; }
-    try { navigator.vibrate(0); } catch (e) {}
-  }
-
-  document.querySelectorAll('[data-alarm]').forEach((b) => {
-    b.addEventListener('click', () => {
-      S.alarmType = b.dataset.alarm;
-      document.querySelectorAll('[data-alarm]').forEach((x) => x.classList.toggle('active', x === b));
-    });
-  });
-
-  $('testSoundBtn').addEventListener('click', () => {
-    if (testTimer) {
-      clearTimeout(testTimer); testTimer = null;
-      stopAlarmLoop();
-      $('testEQ').classList.add('hidden');
-      $('testSoundIcon').textContent = '▶';
-      return;
-    }
-    startAlarmLoop(S.alarmType);
-    $('testEQ').classList.remove('hidden');
-    $('testSoundIcon').textContent = '⏹';
-    testTimer = setTimeout(() => {
-      stopAlarmLoop();
-      testTimer = null;
-      $('testEQ').classList.add('hidden');
-      $('testSoundIcon').textContent = '▶';
-    }, 2600);
-  });
-
-  $('vibToggle').addEventListener('click', (e) => {
-    e.stopPropagation();
-    S.vibration = !S.vibration;
-    $('vibToggle').classList.toggle('on', S.vibration);
-    $('vibToggle').setAttribute('aria-checked', String(S.vibration));
-    if (S.vibration && 'vibrate' in navigator) { try { navigator.vibrate(80); } catch (_) {} }
-  });
-
-  $('demoToggle').addEventListener('click', (e) => {
-    e.stopPropagation();
-    S.demo = !S.demo;
-    $('demoToggle').classList.toggle('on', S.demo);
-    $('demoToggle').setAttribute('aria-checked', String(S.demo));
-    toast(S.demo ? 'Mode démo activé — trajet simulé' : 'Mode démo désactivé', 'info');
-    updateStartButton();
-  });
-
-  /* ------------------------------------------------------------------ */
-  /* 10. UNITY ADS — INTERSTITIEL BP_Interstitial_Android                */
-  /* ------------------------------------------------------------------ */
-  const ADS = {
-    gameId: '5000000',
-    placement: 'BP_Interstitial_Android',
-    testMode: true,
-    enabled: true,
-    minIntervalMs: 45000,
-    maxPerSession: 5,
-    skipDelay: 5,
-    sessionCount: 0,
-    lastShownAt: 0,
-    busy: false
-  };
-
-  function adsBridge() {
-    if (window.AndroidUnityAds && typeof window.AndroidUnityAds.showInterstitial === 'function') {
-      return { type: 'android', api: window.AndroidUnityAds };
-    }
-    if (window.UnityAds && typeof window.UnityAds.show === 'function') {
-      return { type: 'web', api: window.UnityAds };
-    }
-    return null;
-  }
-
-  function initUnityAds() {
-    const b = adsBridge();
-    try {
-      if (b && b.type === 'android' && typeof b.api.init === 'function') {
-        b.api.init(ADS.gameId, ADS.testMode);
-      } else if (b && b.type === 'web' && typeof b.api.initialize === 'function') {
-        b.api.initialize(ADS.gameId, ADS.testMode);
-      }
-    } catch (e) { console.warn('[UnityAds] init', e); }
-  }
-
-  function canShowAd(force) {
-    if (force) return true;
-    if (!ADS.enabled || ADS.busy) return false;
-    if (ADS.sessionCount >= ADS.maxPerSession) return false;
-    if (Date.now() - ADS.lastShownAt < ADS.minIntervalMs) return false;
-    if (S.tracking && !S.alarmActive) return false;   // jamais pendant un suivi actif
-    return true;
-  }
-
-  function showAd(reason, force) {
-    if (!canShowAd(force)) {
-      if (!force) toast('Publicité non éligible pour le moment (anti-spam)', 'info');
-      return false;
-    }
-    const b = adsBridge();
-    if (b) {
-      try {
-        if (b.type === 'android') {
-          const shown = b.api.showInterstitial(ADS.placement);
-          if (shown !== false) {
-            ADS.sessionCount++; ADS.lastShownAt = Date.now(); updateAdsCount();
-            return true;
-          }
-        } else {
-          b.api.show(ADS.placement);
-          ADS.sessionCount++; ADS.lastShownAt = Date.now(); updateAdsCount();
-          return true;
-        }
-      } catch (e) { console.warn('[UnityAds] show', e); }
-    }
-    // Fallback : créa maison « house ad » simulant l'interstitiel
-    renderHouseAd(reason || 'app_open');
-    return true;
-  }
-
-  const AD_CREATIVES = [
-    { emoji: '🚆', brand: 'SNCF Connect', title: 'Voyagez malin dès 19 €',
-      body: 'Réservez vos billets TGV, TER et Intercités en 2 minutes. Annulation et échange flexibles.',
-      cta: 'Voir les offres', bg: 'linear-gradient(135deg,#2563eb,#7c3aed)', btn: 'linear-gradient(135deg,#6366f1,#d946ef)' },
-    { emoji: '🎧', brand: 'AcousticPro ANC', title: '-40 % sur le casque anti-bruit',
-      body: "Le silence absolu en train et en avion. 40 h d'autonomie et son haute-fidélité immersif.",
-      cta: "Profiter de l'offre", bg: 'linear-gradient(135deg,#0ea5e9,#22d3ee)', btn: 'linear-gradient(135deg,#06b6d4,#3b82f6)' },
-    { emoji: '☕', brand: 'CaféNomade', title: 'Votre premier café offert',
-      body: 'Commandez depuis le wagon et retirez sans attendre en gare. Plus de 350 points en France.',
-      cta: 'En profiter', bg: 'linear-gradient(135deg,#f59e0b,#b45309)', btn: 'linear-gradient(135deg,#f59e0b,#ef4444)' }
-  ];
-
-  let adTimer = null, adCloseTimer = null;
-
-  function renderHouseAd(reason) {
-    ADS.busy = true;
-    const overlay = $('adOverlay');
-    const c = AD_CREATIVES[Math.floor(Math.random() * AD_CREATIVES.length)];
-
-    $('adLoading').classList.remove('hidden');
-    $('adCreative').classList.add('hidden');
-    $('adPlacement').textContent = ADS.placement;
-    $('adReason').textContent = reason;
-
-    const skip = $('adSkipBtn');
-    skip.disabled = true;
-    skip.textContent = 'Chargement…';
-
-    const prog = $('adProgress');
-    prog.style.transition = 'none';
-    prog.style.width = '0%';
-
-    $('adHero').style.background = c.bg;
-    $('adEmoji').textContent = c.emoji;
-    $('adBrand').textContent = c.brand;
-    $('adTitle').textContent = c.title;
-    $('adBody').textContent = c.body;
-    $('adCta').textContent = c.cta;
-    $('adCta').style.background = c.btn;
-
-    overlay.classList.add('active');
-    overlay.classList.remove('closing');
-
-    clearTimeout(adCloseTimer);
-    adCloseTimer = setTimeout(() => {
-      $('adLoading').classList.add('hidden');
-      $('adCreative').classList.remove('hidden');
-      startAdCountdown();
-      ADS.sessionCount++;
-      ADS.lastShownAt = Date.now();
-      updateAdsCount();
-    }, 750);
-  }
-
-  function startAdCountdown() {
-    let t = ADS.skipDelay;
-    const btn = $('adSkipBtn');
-    const prog = $('adProgress');
-    btn.disabled = true;
-    btn.textContent = 'Ignorer dans ' + t + 's';
-    prog.style.transition = 'none';
-    prog.style.width = '0%';
-    requestAnimationFrame(() => {
-      prog.style.transition = 'width ' + ADS.skipDelay + 's linear';
-      prog.style.width = '100%';
-    });
-    clearInterval(adTimer);
-    adTimer = setInterval(() => {
-      t--;
-      if (t <= 0) {
-        clearInterval(adTimer); adTimer = null;
-        btn.disabled = false;
-        btn.textContent = 'Ignorer ✕';
-      } else {
-        btn.textContent = 'Ignorer dans ' + t + 's';
-      }
-    }, 1000);
-  }
-
-  function closeAd() {
-    const overlay = $('adOverlay');
-    if (!overlay.classList.contains('active')) return;
-    clearInterval(adTimer); adTimer = null;
-    clearTimeout(adCloseTimer); adCloseTimer = null;
-    overlay.classList.add('closing');
-    setTimeout(() => {
-      overlay.classList.remove('active', 'closing');
-      $('adLoading').classList.remove('hidden');
-      $('adCreative').classList.add('hidden');
-      $('adProgress').style.transition = 'none';
-      $('adProgress').style.width = '0%';
-      ADS.busy = false;
-    }, 300);
-  }
-
-  function updateAdsCount() {
-    $('adsCountTxt').textContent = '(' + ADS.sessionCount + ' diffusé' + (ADS.sessionCount > 1 ? 's' : '') + ')';
-  }
-
-  $('adSkipBtn').addEventListener('click', closeAd);
-  $('adOverlay').addEventListener('click', (e) => {
-    if (!e.target.closest('#adCard') && !$('adSkipBtn').disabled) closeAd();
-  });
-  $('adCta').addEventListener('click', () => {
-    toast('Action publicitaire enregistrée (démo)', 'info');
-    closeAd();
-  });
-  $('adsToggle').addEventListener('click', (e) => {
-    e.stopPropagation();
-    ADS.enabled = !ADS.enabled;
-    $('adsToggle').classList.toggle('on', ADS.enabled);
-    $('adsToggle').setAttribute('aria-checked', String(ADS.enabled));
-    toast(ADS.enabled ? 'Publicités Unity Ads activées' : 'Publicités désactivées', 'info');
-  });
-  $('testAdBtn').addEventListener('click', () => showAd('manual_test', true));
-
-  /* ------------------------------------------------------------------ */
-  /* 11. WAKE LOCK                                                      */
-  /* ------------------------------------------------------------------ */
-  async function requestWakeLock() {
-    try {
-      if ('wakeLock' in navigator) {
-        S.wakeLock = await navigator.wakeLock.request('screen');
-        $('wakeInfo').classList.remove('hidden');
-        $('wakeInfo').classList.add('flex');
-      }
-    } catch (e) { /* non supporté */ }
-  }
-
-  function releaseWakeLock() {
-    try { if (S.wakeLock) S.wakeLock.release(); } catch (e) {}
-    S.wakeLock = null;
-    $('wakeInfo').classList.add('hidden');
-    $('wakeInfo').classList.remove('flex');
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* 12. SUIVI DU TRAJET                                                */
-  /* ------------------------------------------------------------------ */
-  function updateStartButton() {
-    const ok = !!(S.dest && (S.user || S.demo));
-    $('startBtn').disabled = !ok;
-    $('startHint').textContent = !S.dest
-      ? 'Définissez une destination pour activer le suivi'
-      : (!S.user && !S.demo)
-        ? 'En attente du GPS… ou activez le mode démo'
-        : 'Prêt — le GPS restera actif pendant le suivi';
-  }
-
-  $('startBtn').addEventListener('click', () => {
-    if (!S.dest) { toast("Choisissez d'abord une destination", 'warn'); return; }
-    ensureAudio();
-
-    // Mode démo sans GPS : on place l'utilisateur à ~3 km
-    if (S.demo && !S.user) {
-      const a = Math.random() * Math.PI * 2;
-      const dLat = (3000 / 111320) * Math.cos(a);
-      const dLng = (3000 / (111320 * Math.cos(toRad(S.dest.lat)))) * Math.sin(a);
-      S.user = { lat: S.dest.lat + dLat, lng: S.dest.lng + dLng };
-      S.accuracy = 8;
+}
+function stopAlarmKeepTracking(){
+  S.muted=true; S.alarmActive=false;
+  $('alarmOverlay').classList.remove('active');
+  stopAlarmLoop(); stopVibration();
+  toast('Alarme coupée — suivi continue','info');
+  if(ADS.enabled) setTimeout(showBannerHouse, 800);
+}
+function stopAll(){
+  S.tracking=false; S.alarmActive=false; S.muted=false;
+  $('alarmOverlay').classList.remove('active');
+  stopAlarmLoop(); stopVibration();
+  if(S.watchId!=null){ navigator.geolocation.clearWatch(S.watchId); S.watchId=null; }
+  if(S.demoTimer){ clearInterval(S.demoTimer); S.demoTimer=null; }
+  if(S.elapsedTimer){ clearInterval(S.elapsedTimer); S.elapsedTimer=null; }
+  releaseWakeLock();
+  $('panelSetup').classList.remove('hidden'); $('panelTracking').classList.remove('hidden'); // will toggle below
+  $('panelSetup').classList.remove('hidden'); $('panelTracking').classList.add('hidden');
+  $('liveDistance').textContent='—'; $('trackingProgress').style.width='0%';
+  updateStartButton();
+  if(ADS.enabled) showBannerHouse();
+  setTimeout(function(){ showAd('journey_ended', false); }, 900);
+  toast('Suivi arrêté','info');
+}
+function startTracking(){
+  if(!S.dest){ toast('Choisissez d\'abord une destination','warn'); return; }
+  if(!S.user && !S.demo){ toast('En attente du signal GPS…','warn'); requestLocation(false); return; }
+  if(S.demo && S.user && S.dest){
+    S.initialDistance=haversineDistance(S.user,S.dest);
+    if(S.initialDistance==null || S.initialDistance<50){
+      // placer simulation à ~3km si trop proche
+      S.user={lat:S.dest.lat+0.025, lng:S.dest.lng+0.025};
+      S.initialDistance=haversineDistance(S.user,S.dest);
       updateUserLayer();
+      if(map) fitBoth();
     }
-
-    if (!S.user) {
-      toast('Position GPS introuvable — activez le GPS ou le mode démo', 'error');
-      requestLocation(true);
-      return;
-    }
-
-    S.tracking = true;
-    S.alarmActive = false;
-    S.alarmMuted = false;
-    S.muted = false;
-    S.startTime = Date.now();
-    S.initialDistance = haversineDistance(S.user, S.dest);
-
-    pushRecent(S.destName || 'Épingle', S.dest);
-
-    $('panelSetup').classList.add('hidden');
-    $('panelTracking').classList.remove('hidden');
-    $('miniCompass').classList.remove('hidden');
-    $('sheetHint').textContent = 'Suivi en cours';
-    $('muteBtn').textContent = '🔕 Couper son';
-    if (isMobile()) collapseSheet(false);
-
-    requestWakeLock();
-
-    S.elapsed = setInterval(() => {
-      const s = Math.floor((Date.now() - S.startTime) / 1000);
-      $('elapsedTime').textContent =
-        String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-    }, 1000);
-
-    if (S.demo) {
-      startDemoLoop();
-    } else if ('geolocation' in navigator) {
-      S.watchId = navigator.geolocation.watchPosition(
-        (p) => applyPosition(p, false),
-        (err) => { console.warn(err); toast('Signal GPS faible…', 'warn'); },
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
-      );
-    }
-
-    fitBoth();
-    const d = refreshDistances();
-    toast('Suivi démarré — alerte à ' + formatDistance(S.radius), 'success');
-    beep(880, 0.15, 'sine', 0.3, 0);
-    beep(1320, 0.2, 'sine', 0.3, 0.18);
-
-    if (d != null && d <= S.radius) triggerAlarm();
-  });
-
-  function startDemoLoop() {
-    stopDemoLoop();
-    toast('🧪 Simulation du déplacement active…', 'info');
-    S.demoTimer = setInterval(() => {
-      if (!S.tracking || !S.user || !S.dest) return;
-      const d = haversineDistance(S.user, S.dest);
-      const step = Math.max(22, d * 0.05);
-      S.user = moveTowards(S.user, S.dest, step);
-      S.accuracy = 8;
-      S.speed = step;
+  } else if(S.user && S.dest){
+    S.initialDistance=haversineDistance(S.user,S.dest);
+  }
+  S.tracking=true; S.alarmActive=false; S.muted=false; S.startTime=Date.now();
+  $('panelSetup').classList.add('hidden'); $('panelTracking').classList.remove('hidden');
+  hideBannerHouse();
+  requestWakeLock();
+  if('Notification' in window && Notification.permission==='default'){ try{ Notification.requestPermission(); }catch(e){} }
+  // Chrono
+  if(S.elapsedTimer) clearInterval(S.elapsedTimer);
+  S.elapsedTimer=setInterval(function(){
+    var elapsed=Math.floor((Date.now()-S.startTime)/1000);
+    var mm=String(Math.floor(elapsed/60)).padStart(2,'0'), ss=String(elapsed%60).padStart(2,'0');
+    $('elapsedTime').textContent=mm+':'+ss;
+  },1000);
+  if(S.demo){
+    var steps=80, idx=0;
+    var startPos={lat:S.user.lat,lng:S.user.lng}, endPos={lat:S.dest.lat,lng:S.dest.lng};
+    if(S.demoTimer) clearInterval(S.demoTimer);
+    S.demoTimer=setInterval(function(){
+      if(!S.tracking){ clearInterval(S.demoTimer); S.demoTimer=null; return; }
+      idx++;
+      var f=idx/steps;
+      // ease-in-out
+      var eased=f<0.5?2*f*f:1-Math.pow(-2*f+2,2)/2;
+      S.user={lat:startPos.lat+(endPos.lat-startPos.lat)*eased, lng:startPos.lng+(endPos.lng-startPos.lng)*eased};
+      // vitesse simulée ~ 35 km/h
+      S.speed=9.5 + Math.sin(idx*0.4)*1.5;
+      S.accuracy=8+Math.random()*6;
       updateUserLayer();
-      setGpsBadge('ok', 'GPS ±8m (démo)');
+      setGpsBadge('ok','GPS ±'+Math.round(S.accuracy)+'m • DÉMO');
+      $('trackAccuracy').textContent='GPS ±'+Math.round(S.accuracy)+'m • DÉMO';
       refreshDistances();
-    }, 1000);
+      if(idx>=steps){ clearInterval(S.demoTimer); S.demoTimer=null; }
+      if(S.alarmActive){ clearInterval(S.demoTimer); S.demoTimer=null; }
+    }, 600);
+    toast('Mode démo — simulation du trajet démarrée','success');
+  } else {
+    if(S.watchId!=null) navigator.geolocation.clearWatch(S.watchId);
+    S.watchId=navigator.geolocation.watchPosition(function(pos){
+      S.user={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      S.accuracy=pos.coords.accuracy||null;
+      if(pos.coords.speed!=null && pos.coords.speed>=0) S.speed=pos.coords.speed;
+      S.lastFix=Date.now();
+      updateUserLayer();
+      setGpsBadge('ok','GPS ±'+Math.round(S.accuracy||12)+'m');
+      $('trackAccuracy').textContent='GPS ±'+Math.round(S.accuracy||12)+'m';
+      refreshDistances();
+    }, function(err){ console.warn(err); toast('Signal GPS perdu — tentative de reconnexion','warn'); }, {enableHighAccuracy:true, maximumAge:1000, timeout:15000});
+    toast('Suivi GPS démarré — carte Google Maps active','success');
   }
+  if(map) fitBoth();
+}
+function updateStartButton(){
+  var btn=$('startBtn'), hint=$('startHint');
+  var ready=!!S.dest;
+  btn.disabled=!ready;
+  if(!ready){ hint.textContent='Définissez une destination pour activer le suivi'; hint.className='text-center text-[11.5px] text-dim mt-2 font-semibold'; }
+  else if(!S.user && !S.demo){ hint.textContent='En attente du GPS… (ou activez le mode démo)'; hint.className='text-center text-[11.5px] text-amber-500 mt-2 font-bold'; }
+  else { hint.textContent=S.demo?'Prêt — trajet simulé (mode démo)':'Prêt — GPS acquis, vous pouvez démarrer'; hint.className='text-center text-[11.5px] text-green-500 mt-2 font-bold'; }
+}
 
-  function stopDemoLoop() {
-    if (S.demoTimer) { clearInterval(S.demoTimer); S.demoTimer = null; }
-  }
-
-  function updateTrackingUI(dist) {
-    $('liveDistance').textContent = formatDistance(dist);
-
-    const inside = dist <= S.radius;
-    $('insideBadge').classList.toggle('hidden', !inside);
-
-    const speedKmh = S.speed ? S.speed * 3.6 : 0;
-    $('statSpeed').textContent = speedKmh >= 0.5 ? Math.round(speedKmh) : '0';
-
-    let eta = '—';
-    if (speedKmh > 2) {
-      const sec = dist / (speedKmh / 3.6);
-      eta = sec < 60 ? Math.round(sec) + 's' : '~' + Math.round(sec / 60) + 'min';
-    }
-    $('statEta').textContent = eta;
-
-    if (S.user && S.dest) {
-      const b = calculateBearing(S.user, S.dest);
-      $('statCap').textContent = compassLabel(b);
-      $('panelArrow').style.transform = 'rotate(' + b + 'deg)';
-      $('compassArrow').style.transform = 'rotate(' + b + 'deg)';
-      $('headingText').textContent = 'Direction : ' + compassLabel(b) + ' (' + Math.round(b) + '°)';
-    }
-
-    $('compassDist').textContent = formatShort(dist);
-    $('liveSub').textContent = inside
-      ? "🎯 Dans la zone — " + formatDistance(dist) + " avant l'arrivée"
-      : formatDistance(Math.max(0, dist - S.radius)) + ' avant le réveil • ' + formatDistance(dist) + ' au total';
-
-    let pct = 0;
-    if (S.initialDistance && S.initialDistance > S.radius) {
-      pct = Math.min(100, Math.max(0, (1 - (dist - S.radius) / (S.initialDistance - S.radius)) * 100));
-    } else {
-      pct = inside ? 100 : 0;
-    }
-    const bar = $('trackingProgress');
-    bar.style.width = pct + '%';
-    bar.style.background = inside
-      ? 'linear-gradient(90deg,#ff2d55,#ff8a5c)'
-      : pct > 70 ? 'linear-gradient(90deg,#a3e635,#22d3ee)' : 'linear-gradient(90deg,#6366f1,#22d3ee)';
-    $('progressPct').textContent = Math.round(pct) + '%';
-
-    if (S.alarmActive) $('alarmDistance').textContent = formatDistance(dist);
-
-    if (inside && !S.alarmActive && !S.alarmMuted && S.tracking) triggerAlarm();
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* 13. ALARME                                                         */
-  /* ------------------------------------------------------------------ */
-  function triggerAlarm() {
-    if (S.alarmActive) return;
-    S.alarmActive = true;
-
-    const d = haversineDistance(S.user, S.dest);
-    $('alarmDistance').textContent = formatDistance(d);
-    $('alarmOverlay').classList.add('active');
-
-    if (!S.muted) {
-      startAlarmLoop(S.alarmType);
-      startVibrationLoop();
-      beep(1567, 0.4, 'sine', 0.4, 0);
-    }
-  }
-
-  $('alarmStopAll').addEventListener('click', () => stopAll('Alarme et suivi arrêtés — bon voyage ! 👋', 'alarm'));
-
-  $('alarmContinue').addEventListener('click', () => {
-    stopAlarmLoop();
-    stopVibration();
-    S.alarmActive = false;
-    S.alarmMuted = true;
-    $('alarmOverlay').classList.remove('active');
-    toast('Son coupé — le suivi visuel continue', 'info');
+// --- BOTTOM SHEET ---
+function collapseSheet(collapsed){
+  S.sheetCollapsed=collapsed;
+  $('bottomSheet').classList.toggle('collapsed', collapsed);
+  $('sheetHint').textContent=collapsed?'Touchez pour agrandir':'Glisser pour voir la carte';
+  setTimeout(function(){ if(map) map.invalidateSize(); }, 460);
+}
+$('sheetHandle').addEventListener('click', function(){ if(isMobile()) collapseSheet(!S.sheetCollapsed); });
+(function(){
+  var sheet=$('bottomSheet'), startY=0, currentY=0, dragging=false;
+  sheet.addEventListener('touchstart', function(e){ if(!isMobile()) return; if(e.target.closest('button,input')) return; startY=e.touches[0].clientY; dragging=true; sheet.style.transition='none'; }, {passive:true});
+  sheet.addEventListener('touchmove', function(e){ if(!dragging) return; currentY=e.touches[0].clientY; var dy=currentY-startY; if(S.sheetCollapsed && dy<0){ sheet.style.transform='translateY(calc(100% - 86px + '+dy+'px))'; } else if(!S.sheetCollapsed && dy>0){ sheet.style.transform='translateY('+dy+'px)'; } }, {passive:true});
+  sheet.addEventListener('touchend', function(){
+    if(!dragging) return; dragging=false; sheet.style.transition=''; sheet.style.transform='';
+    var dy=currentY-startY;
+    if(Math.abs(dy)>60){ collapseSheet(dy>0); } else { collapseSheet(S.sheetCollapsed); }
   });
+})();
 
-  $('muteBtn').addEventListener('click', () => {
-    S.muted = !S.muted;
-    if (S.muted) { stopAlarmLoop(); stopVibration(); }
-    else if (S.alarmActive) { startAlarmLoop(S.alarmType); startVibrationLoop(); }
-    $('muteBtn').textContent = S.muted ? '🔔 Réactiver son' : '🔕 Couper son';
-    toast(S.muted ? 'Son coupé' : 'Son réactivé', 'info');
-  });
+// --- THEME ---
+$('themeBtn').addEventListener('click', function(){
+  var html=document.documentElement;
+  var isDark=html.getAttribute('data-theme')==='dark';
+  html.setAttribute('data-theme', isDark?'light':'dark');
+  $('iconMoon').classList.toggle('hidden', !isDark);
+  $('iconSun').classList.toggle('hidden', isDark);
+  // Voyager reste identique (Google Maps clair) — on garde la même tuile
+});
 
-  $('stopBtn').addEventListener('click', () => stopAll('Suivi arrêté', 'tracking_stop'));
+// --- CODE MODAL ---
+var codeFiles={
+  install: $('file-install').textContent,
+  maps: $('file-maps').textContent,
+  geo: $('file-geo').textContent,
+  ads: $('file-ads').textContent,
+  map: $('file-map').textContent,
+  app: $('file-app').textContent
+};
+function showCode(file){
+  file=file||'install';
+  document.querySelectorAll('.code-tab').forEach(function(b){ b.classList.toggle('active', b.dataset.file===file); });
+  $('codeContent').textContent=codeFiles[file]||'';
+}
+document.querySelectorAll('.code-tab').forEach(function(b){ b.addEventListener('click', function(){ showCode(b.dataset.file); }); });
+$('codeBtn').addEventListener('click', function(){ $('codeModal').classList.add('open'); showCode('install'); });
+$('codeClose').addEventListener('click', function(){ $('codeModal').classList.remove('open'); });
+$('codeModal').addEventListener('click', function(e){ if(e.target===$('codeModal')) $('codeModal').classList.remove('open'); });
+$('copyCodeBtn').addEventListener('click', function(){
+  var txt=$('codeContent').textContent;
+  if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast('Code copié','success'); }); }
+  else { var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Code copié','success'); }
+});
 
-  function stopAll(msg, source) {
-    S.tracking = false;
-    S.alarmActive = false;
-    S.alarmMuted = false;
-    S.muted = false;
+// --- ONBOARDING ---
+var onboardIdx=0;
+function updateOnboard(){
+  document.querySelectorAll('.slide').forEach(function(s,i){ s.classList.toggle('active', i===onboardIdx); });
+  var dots=$('onboardDots').children;
+  for(var i=0;i<dots.length;i++){ dots[i].style.width=i===onboardIdx?'24px':'8px'; dots[i].style.opacity=i===onboardIdx?'1':'0.35'; }
+  $('onboardNext').textContent=onboardIdx===2?'C\'est parti  →':'Suivant →';
+}
+$('onboardNext').addEventListener('click', function(){
+  if(onboardIdx<2){ onboardIdx++; updateOnboard(); }
+  else { $('onboarding').classList.remove('open'); localStorage.setItem('arriva_onboard','1'); }
+});
+$('onboardSkip').addEventListener('click', function(){ $('onboarding').classList.remove('open'); localStorage.setItem('arriva_onboard','1'); });
+$('gpsEnableBtn').addEventListener('click', function(){ requestLocation(true); });
+if(!localStorage.getItem('arriva_onboard')){ $('onboarding').classList.add('open'); updateOnboard(); }
 
-    if (S.watchId != null) {
-      try { navigator.geolocation.clearWatch(S.watchId); } catch (e) {}
-      S.watchId = null;
-    }
-    stopDemoLoop();
-    stopAlarmLoop();
-    stopVibration();
-    releaseWakeLock();
+// --- CONTROLS ---
+$('locateBtn').addEventListener('click', function(){ if(S.user && map) map.flyTo([S.user.lat,S.user.lng],16,{duration:1}); else requestLocation(true); });
+$('fitBtn').addEventListener('click', fitBoth);
+$('zoomIn').addEventListener('click', function(){ if(map) map.zoomIn(); });
+$('zoomOut').addEventListener('click', function(){ if(map) map.zoomOut(); });
+$('clearDestBtn').addEventListener('click', clearDestination);
+$('centerDestBtn').addEventListener('click', function(){ if(S.dest && map) map.flyTo([S.dest.lat,S.dest.lng],15,{duration:1}); });
+$('changeDestBtn').addEventListener('click', function(){ toast('Touchez la carte Google Maps pour déplacer l\'épingle','info'); if(isMobile()) collapseSheet(true); });
+$('demoDestBtn').addEventListener('click', function(){
+  var pos={lat:48.8445,lng:2.3739}; // Gare de Lyon
+  setDestination(pos,true);
+  S.destName='Gare de Lyon, Paris'; $('destName').textContent=S.destName; $('alarmDest').textContent='📍 '+S.destName; $('destBadgeText').textContent=S.destName;
+  pushRecent(S.destName,pos);
+  if(map) map.flyTo([pos.lat,pos.lng],14,{duration:1.2});
+  toast('Destination d\'exemple : Gare de Lyon','success');
+});
+$('startBtn').addEventListener('click', startTracking);
+$('stopBtn').addEventListener('click', stopAll);
+$('muteBtn').addEventListener('click', function(){ S.muted=true; stopAlarmLoop(); stopVibration(); toast('Son coupé — suivi continue','info'); });
+$('alarmStopAll').addEventListener('click', stopAll);
+$('alarmContinue').addEventListener('click', stopAlarmKeepTracking);
 
-    if (S.elapsed) { clearInterval(S.elapsed); S.elapsed = null; }
-
-    $('alarmOverlay').classList.remove('active');
-    $('panelTracking').classList.add('hidden');
-    $('panelSetup').classList.remove('hidden');
-    $('miniCompass').classList.add('hidden');
-    $('muteBtn').textContent = '🔕 Couper son';
-    $('sheetHint').textContent = 'Glisser pour voir la carte';
-    updateStartButton();
-
-    if (msg) toast(msg, 'info');
-
-    // Interstitiel Unity Ads en fin de trajet (jamais pendant un suivi actif)
-    setTimeout(() => showAd(source === 'alarm' ? 'journey_ended_alarm' : 'tracking_stop'), 950);
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* 14. BOTTOM SHEET                                                   */
-  /* ------------------------------------------------------------------ */
-  function collapseSheet(collapsed) {
-    const sheet = $('bottomSheet');
-    if (!isMobile()) return;
-    sheet.classList.toggle('collapsed', collapsed);
-    if (!collapsed) sheet.scrollTop = 0;
-  }
-
-  $('sheetHandle').addEventListener('click', () => {
-    if (!isMobile()) return;
-    $('bottomSheet').classList.toggle('collapsed');
-  });
-
-  // Repli initial sur mobile après le premier rendu
-  setTimeout(() => { if (isMobile()) collapseSheet(true); }, 900);
-
-  /* ------------------------------------------------------------------ */
-  /* 15. THÈME                                                          */
-  /* ------------------------------------------------------------------ */
-  function setTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    const dark = theme === 'dark';
-    $('iconMoon').classList.toggle('hidden', !dark);
-    $('iconSun').classList.toggle('hidden', dark);
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#070b18' : '#e9edf5');
-    swapTiles();
-    try { localStorage.setItem('arriva_theme', theme); } catch (e) {}
-  }
-
-  $('themeBtn').addEventListener('click', () => {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-  });
-
-  /* ------------------------------------------------------------------ */
-  /* 16. BOUTONS CARTE                                                  */
-  /* ------------------------------------------------------------------ */
-  $('locateBtn').addEventListener('click', () => {
-    if (S.user && map) map.flyTo([S.user.lat, S.user.lng], 16, { duration: 1.1 });
-    else requestLocation(true);
-  });
-  $('fitBtn').addEventListener('click', fitBoth);
-  $('zoomIn').addEventListener('click', () => map && map.zoomIn());
-  $('zoomOut').addEventListener('click', () => map && map.zoomOut());
-
-  $('clearDestBtn').addEventListener('click', () => {
-    clearDestination();
-    toast('Destination supprimée', 'info');
-  });
-  $('centerDestBtn').addEventListener('click', () => {
-    if (S.dest && map) map.flyTo([S.dest.lat, S.dest.lng], 15, { duration: 1 });
-  });
-  $('changeDestBtn').addEventListener('click', () => {
-    if (isMobile()) collapseSheet(true);
-    toast('Touchez la carte pour repositionner l\'épingle', 'info');
-  });
-
-  $('demoDestBtn').addEventListener('click', () => {
-    const pos = { lat: 48.8443, lng: 2.3743 }; // Gare de Lyon, Paris
-    const name = 'Gare de Lyon, Paris';
-    setDestination(pos, true);
-    S.destName = name;
-    $('destName').textContent = name;
-    $('alarmDest').textContent = '📍 ' + name;
-    $('destBadgeText').textContent = name;
-    pushRecent(name, pos);
-    if (map) map.flyTo([pos.lat, pos.lng], 15, { duration: 1.2 });
-    toast('Destination d\'exemple définie', 'success');
-    if (isMobile()) collapseSheet(true);
-  });
-
-  /* ------------------------------------------------------------------ */
-  /* 17. MODAL CODE SOURCE                                              */
-  /* ------------------------------------------------------------------ */
-  function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  function highlight(code) {
-    const esc = escapeHtml(code);
-    const re = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b(const|let|var|function|return|if|else|import|from|export|default|new|try|catch|async|await|class|switch|case|break|of|in|null|true|false|typeof|this|window|document|navigator|Math|Date|useState|useEffect|useRef|useCallback|useMemo|module)\b|\b(\d+(?:\.\d+)?)\b/g;
-    return esc.replace(re, (m, comment, str, kw, num) => {
-      if (comment) return '<span class="code-comment">' + comment + '</span>';
-      if (str) return '<span class="code-string">' + str + '</span>';
-      if (kw) return '<span class="code-keyword">' + kw + '</span>';
-      if (num) return '<span class="code-num">' + num + '</span>';
-      return m;
-    });
-  }
-
-  let currentCodeId = 'file-install';
-
-  function showCode(id) {
-    const tpl = $(id);
-    if (!tpl) return;
-    currentCodeId = id;
-    $('codeContent').innerHTML = highlight(tpl.textContent.replace(/^\n/, ''));
-    document.querySelectorAll('#codeTabs .code-tab').forEach((b) => {
-      b.classList.toggle('active', 'file-' + b.dataset.file === id);
-    });
-    $('codeModal').querySelector('.flex-1.overflow-auto').scrollTop = 0;
-  }
-
-  $('codeBtn').addEventListener('click', () => {
-    $('codeModal').classList.add('open');
-    showCode(currentCodeId);
-  });
-  $('codeClose').addEventListener('click', () => $('codeModal').classList.remove('open'));
-  $('codeModal').addEventListener('click', (e) => {
-    if (e.target === $('codeModal')) $('codeModal').classList.remove('open');
-  });
-  document.querySelectorAll('#codeTabs .code-tab').forEach((b) => {
-    b.addEventListener('click', () => showCode('file-' + b.dataset.file));
-  });
-  $('copyCodeBtn').addEventListener('click', async () => {
-    const tpl = $(currentCodeId);
-    if (!tpl) return;
-    try {
-      await navigator.clipboard.writeText(tpl.textContent);
-      $('copyCodeBtn').textContent = '✓ Copié';
-      setTimeout(() => { $('copyCodeBtn').textContent = '⧉ Copier'; }, 1800);
-    } catch (e) {
-      toast('Copie impossible dans cet environnement', 'warn');
-    }
-  });
-
-  /* ------------------------------------------------------------------ */
-  /* 18. ONBOARDING                                                     */
-  /* ------------------------------------------------------------------ */
-  let slideIndex = 0;
-  const SLIDES = 3;
-
-  function renderSlide(i) {
-    slideIndex = Math.max(0, Math.min(SLIDES - 1, i));
-    document.querySelectorAll('#onboarding .slide').forEach((s, idx) => {
-      s.classList.toggle('active', idx === slideIndex);
-    });
-    document.querySelectorAll('#onboardDots .dot, #onboardDots > div').forEach((d, idx) => {
-      const active = idx === slideIndex;
-      d.style.width = active ? '24px' : '8px';
-      d.style.background = active ? '#fff' : 'rgba(255,255,255,.25)';
-    });
-    $('onboardNext').textContent = slideIndex === SLIDES - 1 ? 'Commencer 🚀' : 'Suivant →';
-  }
-
-  function closeOnboarding(runAd) {
-    $('onboarding').classList.remove('open');
-    try { localStorage.setItem('arriva_onboarded', '1'); } catch (e) {}
-    if (runAd) setTimeout(() => showAd('app_open'), 1200);
-  }
-
-  $('onboardNext').addEventListener('click', () => {
-    if (slideIndex < SLIDES - 1) renderSlide(slideIndex + 1);
-    else closeOnboarding(true);
-  });
-  $('onboardSkip').addEventListener('click', () => closeOnboarding(true));
-  $('gpsEnableBtn').addEventListener('click', () => {
-    requestLocation(true);
-    closeOnboarding(false);
-  });
-
-  /* ------------------------------------------------------------------ */
-  /* 19. INITIALISATION GLOBALE                                         */
-  /* ------------------------------------------------------------------ */
-  function boot() {
-    // Thème mémorisé
-    let theme = 'dark';
-    try { theme = localStorage.getItem('arriva_theme') || 'dark'; } catch (e) {}
-    setTheme(theme);
-
-    initMap();
-    initUnityAds();
-    updateAdsCount();
-    setRadius(500);
-    updateStartButton();
-
-    // Écoute permanente de la position pour afficher le marqueur
-    if ('geolocation' in navigator) {
-      setGpsBadge('warn', 'Localisation…');
-      navigator.geolocation.getCurrentPosition(
-        (pos) => applyPosition(pos, true),
-        (err) => {
-          console.warn('GPS initial :', err.message);
-          setGpsBadge('err', 'GPS indisponible');
-          if (map) map.setView([48.8566, 2.3522], 13);
-          updateStartButton();
-        },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 4000 }
-      );
-    } else {
-      setGpsBadge('err', 'GPS non supporté');
-    }
-
-    // Reprise du wake lock si l'onglet revient au premier plan
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && S.tracking && !S.wakeLock) requestWakeLock();
-    });
-
-    // Onboarding au premier lancement
-    let seen = false;
-    try { seen = localStorage.getItem('arriva_onboarded') === '1'; } catch (e) {}
-    if (!seen) {
-      $('onboarding').classList.add('open');
-      renderSlide(0);
-    }
-
-    // Sécurité : libère l'audio lors du premier geste utilisateur
-    const unlock = () => { ensureAudio(); document.removeEventListener('pointerdown', unlock); };
-    document.addEventListener('pointerdown', unlock);
-
-    console.log('%cARRIVA', 'color:#22d3ee;font-weight:700', '— runtime prêt • placement ads: ' + ADS.placement);
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+// --- INIT ---
+initMap();
+requestLocation(true);
+initUnityAdsSDK();
+setRadius(500);
+updateStartButton();
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && S.tracking && S.wakeLock==null) requestWakeLock(); });
+// Ré-afficher bannière au retour
+window.addEventListener('focus', function(){ if(ADS.enabled && !S.tracking && !ADS.bannerVisible) showBannerHouse(); });
 })();
 </script>
 </body>
