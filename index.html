@@ -1,0 +1,757 @@
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0b1220" />
+<title>ArrivAlert · Alerte d'arrivée GPS</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- React + ReactDOM + Babel -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<style>
+  html, body, #root { height: 100%; margin: 0; padding: 0; }
+  body {
+    background: #0b1220;
+    font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #root { height: 100dvh; }
+
+  /* Leaflet dark theme tweaks */
+  .leaflet-container {
+    background: #0f172a;
+    font-family: inherit;
+  }
+  .leaflet-bar a, .leaflet-control-zoom a {
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
+  }
+  .leaflet-bar a:hover { background: #334155 !important; }
+  .leaflet-control-attribution {
+    background: rgba(15,23,42,.7) !important;
+    color: #94a3b8 !important;
+    font-size: 10px !important;
+  }
+  .leaflet-control-attribution a { color: #60a5fa !important; }
+
+  /* Custom destination marker pulse */
+  .destination-pin {
+    width: 28px; height: 28px;
+    position: relative;
+  }
+  .destination-pin::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 50% 50% 50% 0;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    transform: rotate(-45deg);
+    box-shadow: 0 6px 14px rgba(239,68,68,.5);
+  }
+  .destination-pin::after {
+    content: '';
+    position: absolute;
+    top: 6px; left: 6px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transform: rotate(-45deg);
+  }
+
+  /* User position pulsing dot */
+  .user-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #38bdf8;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 0 rgba(56,189,248,.7);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(56,189,248,.6); }
+    70% { box-shadow: 0 0 0 18px rgba(56,189,248,0); }
+    100% { box-shadow: 0 0 0 0 rgba(56,189,248,0); }
+  }
+
+  /* Radius circle styling handled by Leaflet path options */
+
+  /* Alert overlay flash */
+  .alert-flash {
+    animation: alertFlash 1s ease-in-out infinite alternate;
+  }
+  @keyframes alertFlash {
+    from { background: rgba(239,68,68,.92); }
+    to { background: rgba(220,38,38,.98); }
+  }
+
+  /* Bottom sheet slide */
+  .sheet-enter { animation: slideUp .35s ease both; }
+  @keyframes slideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  /* Custom range slider */
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    height: 6px; border-radius: 999px;
+    background: linear-gradient(90deg,#38bdf8,#6366f1);
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; border: 3px solid #38bdf8;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; border: 3px solid #38bdf8;
+    cursor: pointer;
+  }
+
+  .glass {
+    background: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+  }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .btn-press { transition: transform .08s ease, box-shadow .2s ease; }
+  .btn-press:active { transform: scale(.96); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ============================================================
+   geo.js — Utilitaires GPS
+   Formule de Haversine pour calculer la distance entre deux
+   coordonnées GPS (en mètres).
+   ============================================================ */
+const toRad = (deg) => (deg * Math.PI) / 180;
+
+/**
+ * Calcule la distance (en mètres) entre deux points GPS
+ * en utilisant la formule de Haversine.
+ * @param {{lat:number, lng:number}} a
+ * @param {{lat:number, lng:number}} b
+ * @returns {number} distance en mètres
+ */
+function haversineDistance(a, b) {
+  const R = 6371000; // rayon de la Terre en mètres
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1) * Math.cos(lat2) *
+            Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+}
+
+/** Formate une distance (mètres ou km lisibles) */
+function formatDistance(meters) {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(2)} km`;
+}
+
+/* ============================================================
+   Audio — Alerte sonore (Web Audio API Oscillator)
+   ============================================================ */
+function useAlarmSound() {
+  const ctxRef = useRef(null);
+  const intervalRef = useRef(null);
+  const playingRef = useRef(false);
+
+  const play = useCallback(() => {
+    if (playingRef.current) return;
+    playingRef.current = true;
+    if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+
+    const beep = (time, freq) => {
+      const ctx = ctxRef.current;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(0.4, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + 0.35);
+    };
+
+    const loop = () => {
+      const ctx = ctxRef.current;
+      const now = ctx.currentTime;
+      beep(now, 880);
+      beep(now + 0.4, 1100);
+    };
+    loop();
+    intervalRef.current = setInterval(loop, 900);
+  }, []);
+
+  const stop = useCallback(() => {
+    playingRef.current = false;
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    if (ctxRef.current && ctxRef.current.state === 'running') {
+      ctxRef.current.close().then(() => { ctxRef.current = null; });
+    }
+  }, []);
+
+  return { play, stop };
+}
+
+/* ============================================================
+   useGeolocation — Wrapper autour de navigator.geolocation
+   ============================================================ */
+function useGeolocation() {
+  const [position, setPosition] = useState(null);
+  const [error, setError] = useState(null);
+  const watchIdRef = useRef(null);
+
+  const getOnce = useCallback(() => new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("Géolocalisation non supportée"));
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        setPosition(p);
+        resolve(p);
+      },
+      (err) => { setError(err.message); reject(err); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+  }), []);
+
+  const watch = useCallback((onUpdate) => {
+    if (!navigator.geolocation) return null;
+    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        setPosition(p);
+        onUpdate && onUpdate(p);
+      },
+      (err) => setError(err.message),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+    );
+    return watchIdRef.current;
+  }, []);
+
+  const stopWatch = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  }, []);
+
+  return { position, error, getOnce, watch, stopWatch, setPosition };
+}
+
+/* ============================================================
+   MapComponent.jsx — Carte Leaflet interactive
+   ============================================================ */
+function MapComponent({ userPos, destination, radius, onMapClick, followUser, mapRef }) {
+  const containerRef = useRef(null);
+  const leafletMap = useRef(null);
+  const userMarkerRef = useRef(null);
+  const destMarkerRef = useRef(null);
+  const circleRef = useRef(null);
+  const userLayerRef = useRef(null);
+  const destLayerRef = useRef(null);
+  const [ready, setReady] = useState(false);
+
+  // Init map
+  useEffect(() => {
+    if (leafletMap.current || !containerRef.current) return;
+    const map = L.map(containerRef.current, {
+      zoomControl: true,
+      attributionControl: true,
+      zoomSnap: 0.25,
+    }).setView([46.6, 2.4], 5);
+
+    // Dark tile layer (CartoDB Dark Matter - gratuit, sans clé API)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 20,
+    }).addTo(map);
+
+    map.on('click', (e) => {
+      onMapClick && onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
+    });
+
+    leafletMap.current = map;
+    mapRef.current = map;
+    setReady(true);
+
+    // Fix taille après montage
+    setTimeout(() => map.invalidateSize(), 200);
+
+    return () => { map.remove(); leafletMap.current = null; };
+  }, []);
+
+  // Expose invalidateSize on resize
+  useEffect(() => {
+    const onResize = () => leafletMap.current && leafletMap.current.invalidateSize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // User marker
+  useEffect(() => {
+    if (!leafletMap.current || !userPos) return;
+    const map = leafletMap.current;
+    const icon = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [18,18], iconAnchor: [9,9] });
+
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = L.marker([userPos.lat, userPos.lng], { icon, zIndexOffset: 1000 }).addTo(map);
+    } else {
+      userMarkerRef.current.setLatLng([userPos.lat, userPos.lng]);
+    }
+    if (followUser) {
+      map.setView([userPos.lat, userPos.lng], Math.max(map.getZoom(), 16), { animate: true });
+    }
+  }, [userPos, followUser]);
+
+  // Destination marker + radius circle
+  useEffect(() => {
+    if (!leafletMap.current) return;
+    const map = leafletMap.current;
+
+    if (destination) {
+      const icon = L.divIcon({ className: '', html: '<div class="destination-pin"></div>', iconSize: [28,28], iconAnchor: [14,28] });
+      if (!destMarkerRef.current) {
+        destMarkerRef.current = L.marker([destination.lat, destination.lng], { icon }).addTo(map);
+      } else {
+        destMarkerRef.current.setLatLng([destination.lat, destination.lng]);
+      }
+      map.setView([destination.lat, destination.lng], Math.max(map.getZoom(), 14), { animate: true });
+
+      // Circle radius
+      if (circleRef.current) map.removeLayer(circleRef.current);
+      circleRef.current = L.circle([destination.lat, destination.lng], {
+        radius: radius,
+        color: '#ef4444',
+        fillColor: '#ef4444',
+        fillOpacity: 0.12,
+        weight: 2,
+        dashArray: '6 6',
+      }).addTo(map);
+    } else {
+      if (destMarkerRef.current) { map.removeLayer(destMarkerRef.current); destMarkerRef.current = null; }
+      if (circleRef.current) { map.removeLayer(circleRef.current); circleRef.current = null; }
+    }
+  }, [destination]);
+
+  // Update circle radius live
+  useEffect(() => {
+    if (circleRef.current && destination) circleRef.current.setRadius(radius);
+  }, [radius, destination]);
+
+  return <div ref={containerRef} className="absolute inset-0 z-0" />;
+}
+
+/* ============================================================
+   SearchBar — Recherche d'adresse via Nominatim (gratuit)
+   ============================================================ */
+function SearchBar({ onSelect }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const timerRef = useRef(null);
+
+  const search = useCallback(async (q) => {
+    if (q.trim().length < 3) { setResults([]); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`, {
+        headers: { 'Accept-Language': 'fr' }
+      });
+      const data = await res.json();
+      setResults(data);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }, []);
+
+  const onChange = (val) => {
+    setQuery(val);
+    setOpen(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => search(val), 400);
+  };
+
+  const choose = (r) => {
+    const pos = { lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
+    setQuery(r.display_name.split(',').slice(0,2).join(','));
+    setOpen(false);
+    onSelect(pos);
+  };
+
+  return (
+    <div className="relative">
+      <div className="glass rounded-2xl flex items-center gap-2 px-3 py-2.5 shadow-2xl">
+        <svg className="w-5 h-5 text-sky-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input
+          value={query}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setOpen(true)}
+          placeholder="Rechercher une adresse, un lieu…"
+          className="bg-transparent outline-none text-sm text-slate-100 placeholder-slate-400 flex-1 min-w-0"
+        />
+        {loading && <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0" />}
+        {query && !loading && (
+          <button onClick={() => { setQuery(''); setResults([]); }} className="text-slate-400 hover:text-slate-200 shrink-0">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        )}
+      </div>
+      {open && results.length > 0 && (
+        <div className="glass mt-2 rounded-2xl overflow-hidden shadow-2xl max-h-72 overflow-y-auto no-scrollbar z-50">
+          {results.map((r) => (
+            <button
+              key={r.place_id}
+              onClick={() => choose(r)}
+              className="w-full text-left px-4 py-3 hover:bg-slate-700/50 transition border-b border-slate-700/40 last:border-0"
+            >
+              <div className="text-sm text-slate-100 line-clamp-2">{r.display_name}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   App.jsx — Composant principal
+   ============================================================ */
+function App() {
+  const mapRef = useRef(null);
+  const { position, error, getOnce, watch, stopWatch, setPosition } = useGeolocation();
+  const { play: playAlarm, stop: stopAlarm } = useAlarmSound();
+
+  const [destination, setDestination] = useState(null);
+  const [radius, setRadius] = useState(500); // mètres
+  const [tracking, setTracking] = useState(false);
+  const [alertActive, setAlertActive] = useState(false);
+  const [distance, setDistance] = useState(null);
+  const [followUser, setFollowUser] = useState(true);
+  const [permissionAsked, setPermissionAsked] = useState(false);
+
+  // Demande la position au démarrage
+  useEffect(() => {
+    getOnce().catch(() => {});
+    setPermissionAsked(true);
+  }, []);
+
+  // Suivi actif
+  const startTracking = useCallback(() => {
+    if (!destination) {
+      alert("Veuillez d'abord sélectionner une destination sur la carte ou via la recherche.");
+      return;
+    }
+    setAlertActive(false);
+    setTracking(true);
+    setFollowUser(true);
+    playAlarm(); // débloque l'audio context sur interaction utilisateur
+    stopAlarm();
+
+    watch((p) => {
+      if (!destination) return;
+      const d = haversineDistance(p, destination);
+      setDistance(d);
+      if (d <= radius && !alertActive) {
+        triggerAlert();
+      } else if (d > radius && alertActive) {
+        // sortir de la zone désactive automatiquement l'alarme visuelle/sonore
+        stopAlarm();
+        setAlertActive(false);
+      }
+    });
+  }, [destination, radius, alertActive, watch]);
+
+  const triggerAlert = useCallback(() => {
+    setAlertActive(true);
+    playAlarm();
+    if (navigator.vibrate) {
+      try { navigator.vibrate([500, 200, 500, 200, 500, 200, 500]); } catch(e) {}
+    }
+  }, [playAlarm]);
+
+  const stopTracking = useCallback(() => {
+    setTracking(false);
+    setAlertActive(false);
+    stopAlarm();
+    stopWatch();
+  }, [stopAlarm, stopWatch]);
+
+  // Recalcul de la distance si la destination ou la position change hors tracking
+  useEffect(() => {
+    if (destination && position && !tracking) {
+      setDistance(haversineDistance(position, destination));
+    }
+  }, [destination, position, tracking]);
+
+  const handleMapClick = useCallback((coords) => {
+    setDestination(coords);
+  }, []);
+
+  const recenter = useCallback(() => {
+    if (position && mapRef.current) {
+      mapRef.current.setView([position.lat, position.lng], 16, { animate: true });
+      setFollowUser(true);
+    }
+  }, [position]);
+
+  const clearDestination = () => {
+    setDestination(null);
+    setDistance(null);
+    if (tracking) stopTracking();
+  };
+
+  // Progress d'approche (pour la barre visuelle)
+  const progress = useMemo(() => {
+    if (!distance || !radius) return 0;
+    // 0 quand loin (> 3x radius), 100 quand arrivé
+    const max = radius * 3;
+    const v = Math.min(100, Math.max(0, (1 - (distance - radius) / (max - radius)) * 100));
+    return distance <= radius ? 100 : v;
+  }, [distance, radius]);
+
+  return (
+    <div className="relative w-full h-full overflow-hidden bg-slate-950 text-slate-100 select-none">
+      {/* Carte */}
+      <MapComponent
+        userPos={position}
+        destination={destination}
+        radius={radius}
+        onMapClick={handleMapClick}
+        followUser={followUser && tracking}
+        mapRef={mapRef}
+      />
+
+      {/* Overlay top : Search + status */}
+      <div className="absolute top-0 left-0 right-0 z-[500] px-3 pt-3 pb-2 pointer-events-none">
+        <div className="max-w-md mx-auto pointer-events-auto">
+          <div className="flex items-center justify-between mb-2">
+            <div className="glass rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg">
+              <div className={"w-2 h-2 rounded-full " + (position ? "bg-emerald-400" : "bg-amber-400 animate-pulse")}></div>
+              <span className="text-xs font-medium text-slate-200">
+                {position ? "GPS actif" : "Localisation…"}
+              </span>
+            </div>
+            <div className="glass rounded-full px-3 py-1.5 text-xs font-medium text-slate-200 shadow-lg">
+              ArrivAlert
+            </div>
+          </div>
+          <SearchBar onSelect={setDestination} />
+        </div>
+      </div>
+
+      {/* Bouton recentrer */}
+      {position && (
+        <button
+          onClick={recenter}
+          className="absolute right-3 z-[500] glass rounded-full w-11 h-11 flex items-center justify-center shadow-2xl btn-press"
+          style={{ bottom: 'calc(50% - 24px)' }}
+          aria-label="Recentrer"
+        >
+          <svg className="w-5 h-5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3"/>
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+          </svg>
+        </button>
+      )}
+
+      {/* Bottom panel */}
+      <div className="absolute bottom-0 left-0 right-0 z-[500] px-3 pb-4">
+        <div className="max-w-md mx-auto glass rounded-3xl p-4 shadow-2xl sheet-enter">
+          {/* Destination summary */}
+          {destination ? (
+            <div className="flex items-start gap-3 mb-3">
+              <div className="mt-0.5">
+                <div className="destination-pin" style={{ transform: 'scale(.7)' }}></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] uppercase tracking-wider text-rose-400 font-semibold">Destination</div>
+                <div className="text-sm text-slate-100 font-mono truncate">
+                  {destination.lat.toFixed(5)}, {destination.lng.toFixed(5)}
+                </div>
+              </div>
+              <button onClick={clearDestination} className="text-slate-400 hover:text-rose-400 transition btn-press">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mb-3 text-slate-300">
+              <svg className="w-5 h-5 text-sky-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11a8 8 0 1 1 16 0c0 6.5-8 11-8 11Z"/><circle cx="12" cy="11" r="3"/></svg>
+              <div className="text-sm">
+                Touchez la carte ou recherchez un lieu pour définir votre destination.
+              </div>
+            </div>
+          )}
+
+          {/* Distance live */}
+          {destination && distance !== null && (
+            <div className="mb-3 rounded-2xl bg-slate-800/60 p-3 border border-slate-700/50">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-slate-400">Distance restante</span>
+                <span className={"text-2xl font-bold tabular-nums " + (alertActive ? "text-rose-400" : "text-sky-300")}>
+                  {formatDistance(distance)}
+                </span>
+              </div>
+              {/* Barre de progression d'approche */}
+              <div className="mt-2 h-2 rounded-full bg-slate-700/60 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${progress}%`,
+                    background: alertActive
+                      ? 'linear-gradient(90deg,#ef4444,#f97316)'
+                      : 'linear-gradient(90deg,#38bdf8,#6366f1)'
+                  }}
+                />
+              </div>
+              <div className="mt-1.5 flex justify-between text-[10px] text-slate-500">
+                <span>Réveil à {formatDistance(radius)}</span>
+                <span>{progress >= 100 ? 'Arrivé !' : `${Math.round(progress)}%`}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Rayon d'alerte */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-slate-400 font-medium">Rayon d'alerte</label>
+              <span className="text-xs font-bold text-sky-300 tabular-nums">{formatDistance(radius)}</span>
+            </div>
+            <input
+              type="range" min="100" max="2000" step="50"
+              value={radius}
+              onChange={(e) => setRadius(parseInt(e.target.value))}
+              disabled={tracking}
+              className="w-full"
+            />
+            <div className="mt-2 flex gap-2">
+              {[200, 500, 1000].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRadius(r)}
+                  disabled={tracking}
+                  className={"flex-1 text-xs py-1.5 rounded-xl border transition btn-press " +
+                    (radius === r
+                      ? "bg-sky-500/20 border-sky-400 text-sky-300"
+                      : "border-slate-700 text-slate-400 hover:border-slate-500")}
+                >
+                  {r < 1000 ? `${r}m` : `${r/1000}km`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Boutons d'action */}
+          {!tracking ? (
+            <button
+              onClick={startTracking}
+              disabled={!destination}
+              className="w-full py-3.5 rounded-2xl font-semibold text-white shadow-lg btn-press transition disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg,#38bdf8,#6366f1)' }}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m5 3 14 9-14 9V3Z"/></svg>
+                Démarrer le suivi du trajet
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={stopTracking}
+              className="w-full py-3.5 rounded-2xl font-semibold text-white shadow-lg btn-press alert-flash"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                Arrêter l'alarme et le suivi
+              </span>
+            </button>
+          )}
+
+          {error && (
+            <div className="mt-3 text-xs text-rose-400 text-center">
+              GPS : {error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ALERTE PLEIN ÉCRAN */}
+      {alertActive && (
+        <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center alert-flash px-6 text-center">
+          <div className="animate-bounce">
+            <svg className="w-24 h-24 text-white mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M12 2 2 22h20L12 2Z"/><path d="M12 9v6"/><circle cx="12" cy="18" r="1" fill="currentColor"/>
+            </svg>
+          </div>
+          <h1 className="text-3xl font-black text-white mt-6 drop-shadow-lg">Vous arrivez à destination !</h1>
+          <p className="text-white/90 mt-2 text-lg">
+            Distance : <span className="font-bold">{distance ? formatDistance(distance) : ''}</span>
+          </p>
+          <button
+            onClick={stopTracking}
+            className="mt-8 px-8 py-4 bg-white text-rose-600 rounded-2xl font-bold shadow-2xl btn-press text-lg"
+          >
+            Arrêter l'alarme
+          </button>
+          <p className="text-white/70 text-xs mt-4">Touchez le bouton pour stopper le suivi et le son.</p>
+        </div>
+      )}
+
+      {/* État initial : demande d'autorisation GPS */}
+      {permissionAsked && !position && !error && (
+        <div className="absolute inset-0 z-[900] flex items-center justify-center bg-slate-950/80 px-6">
+          <div className="glass rounded-3xl p-6 max-w-sm text-center">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-sky-500/20 flex items-center justify-center mb-4">
+              <svg className="w-7 h-7 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11a8 8 0 1 1 16 0c0 6.5-8 11-8 11Z"/><circle cx="12" cy="11" r="3"/></svg>
+            </div>
+            <h2 className="text-lg font-bold text-slate-100">Activation du GPS</h2>
+            <p className="text-sm text-slate-400 mt-2">
+              Autorisez la géolocalisation pour centrer la carte sur votre position et suivre votre trajet.
+            </p>
+            <div className="mt-4 w-full h-1.5 rounded-full bg-slate-700 overflow-hidden">
+              <div className="h-full w-1/2 bg-sky-400 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
