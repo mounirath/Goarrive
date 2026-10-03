@@ -1,757 +1,994 @@
-<html lang="fr">
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="theme-color" content="#0b1220" />
-<title>ArrivAlert · Alerte d'arrivée GPS</title>
-
-<!-- Tailwind CSS -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ARRIVA — Alerte d'Arrivée GPS Intelligente</title>
+<meta name="theme-color" content="#0a0f1e">
 <script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Leaflet CSS & JS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- React + ReactDOM + Babel -->
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>tailwind.config = { theme: { extend: { fontFamily: { sans: ['Plus Jakarta Sans','system-ui','sans-serif'], display: ['Space Grotesk','sans-serif'], mono: ['JetBrains Mono','monospace'], }, colors: { ink: '#0a0f1e', panel: '#111a33', accent: '#6366f1', neon: '#22d3ee', alert: '#ff2d55', lime: '#a3e635', }, boxShadow: { glow: '0 0 40px rgba(99,102,241,.35)', alertGlow: '0 0 60px rgba(255,45,85,.5)', } } } }</script>
 <style>
-  html, body, #root { height: 100%; margin: 0; padding: 0; }
-  body {
-    background: #0b1220;
-    font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    overscroll-behavior: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-  #root { height: 100dvh; }
-
-  /* Leaflet dark theme tweaks */
-  .leaflet-container {
-    background: #0f172a;
-    font-family: inherit;
-  }
-  .leaflet-bar a, .leaflet-control-zoom a {
-    background: #1e293b !important;
-    color: #e2e8f0 !important;
-    border-color: #334155 !important;
-  }
-  .leaflet-bar a:hover { background: #334155 !important; }
-  .leaflet-control-attribution {
-    background: rgba(15,23,42,.7) !important;
-    color: #94a3b8 !important;
-    font-size: 10px !important;
-  }
-  .leaflet-control-attribution a { color: #60a5fa !important; }
-
-  /* Custom destination marker pulse */
-  .destination-pin {
-    width: 28px; height: 28px;
-    position: relative;
-  }
-  .destination-pin::before {
-    content: '';
-    position: absolute; inset: 0;
-    border-radius: 50% 50% 50% 0;
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    transform: rotate(-45deg);
-    box-shadow: 0 6px 14px rgba(239,68,68,.5);
-  }
-  .destination-pin::after {
-    content: '';
-    position: absolute;
-    top: 6px; left: 6px;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background: #fff;
-    transform: rotate(-45deg);
-  }
-
-  /* User position pulsing dot */
-  .user-dot {
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    background: #38bdf8;
-    border: 3px solid #fff;
-    box-shadow: 0 0 0 0 rgba(56,189,248,.7);
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(56,189,248,.6); }
-    70% { box-shadow: 0 0 0 18px rgba(56,189,248,0); }
-    100% { box-shadow: 0 0 0 0 rgba(56,189,248,0); }
-  }
-
-  /* Radius circle styling handled by Leaflet path options */
-
-  /* Alert overlay flash */
-  .alert-flash {
-    animation: alertFlash 1s ease-in-out infinite alternate;
-  }
-  @keyframes alertFlash {
-    from { background: rgba(239,68,68,.92); }
-    to { background: rgba(220,38,38,.98); }
-  }
-
-  /* Bottom sheet slide */
-  .sheet-enter { animation: slideUp .35s ease both; }
-  @keyframes slideUp {
-    from { transform: translateY(40px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-
-  /* Custom range slider */
-  input[type=range] {
-    -webkit-appearance: none; appearance: none;
-    height: 6px; border-radius: 999px;
-    background: linear-gradient(90deg,#38bdf8,#6366f1);
-    outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 22px; height: 22px; border-radius: 50%;
-    background: #fff; border: 3px solid #38bdf8;
-    box-shadow: 0 2px 6px rgba(0,0,0,.3);
-    cursor: pointer;
-  }
-  input[type=range]::-moz-range-thumb {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: #fff; border: 3px solid #38bdf8;
-    cursor: pointer;
-  }
-
-  .glass {
-    background: rgba(15, 23, 42, 0.78);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-  }
-
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-  .btn-press { transition: transform .08s ease, box-shadow .2s ease; }
-  .btn-press:active { transform: scale(.96); }
+:root{ --bg-panel: rgba(13,19,42,.86); --bg-panel-solid:#0d132a; --bg-chip: rgba(255,255,255,.08); --text-main:#f1f5f9; --text-dim:#94a3b8; --border: rgba(255,255,255,.12); --map-filter:none;}
+html[data-theme="light"]{ --bg-panel: rgba(255,255,255,.92); --bg-panel-solid:#ffffff; --bg-chip: rgba(15,23,42,.06); --text-main:#0f172a; --text-dim:#64748b; --border: rgba(15,23,42,.12);}
+*{ -webkit-tap-highlight-color: transparent; }
+html,body{ height:100%; overscroll-behavior:none; }
+body{ font-family:'Plus Jakarta Sans',system-ui,sans-serif; background:#0a0f1e; color:var(--text-main); overflow:hidden; }
+#map{ position:absolute; inset:0; z-index:0; background:#0a0f1e; }
+.leaflet-container{ font-family:'Plus Jakarta Sans',sans-serif; }
+html[data-theme="dark"] .leaflet-container{ background:#0a0f1e; }
+html[data-theme="light"] .leaflet-container{ background:#e2e8f0; }
+.leaflet-control-attribution{ font-size:9px!important; background:rgba(0,0,0,.4)!important; color:#94a3b8!important; backdrop-filter:blur(8px); }
+.leaflet-control-attribution a{ color:#cbd5e1!important; }
+.leaflet-control-zoom{ display:none!important; }
+.glass{ background:var(--bg-panel); backdrop-filter:blur(22px) saturate(1.4); -webkit-backdrop-filter:blur(22px) saturate(1.4); border:1px solid var(--border); }
+.glass-strong{ background:var(--bg-panel-solid); border:1px solid var(--border); }
+.chip{ background:var(--bg-chip); border:1px solid var(--border); color:var(--text-main); }
+.text-dim{ color:var(--text-dim)!important; }
+.user-wrap{ position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+.user-radar{ position:absolute; inset:-22px; border-radius:50%; background:conic-gradient(from 0deg, rgba(34,211,238,.5), transparent 70deg, transparent); animation:spin 2.5s linear infinite; }
+.user-pulse-ring{ position:absolute; inset:-10px; border-radius:50%; border:2px solid rgba(34,211,238,.6); animation:ringPulse 2s ease-out infinite; }
+.user-dot{ width:18px; height:18px; background:linear-gradient(135deg,#22d3ee,#6366f1); border:3px solid #fff; border-radius:50%; box-shadow:0 0 20px rgba(34,211,238,.8), 0 2px 10px rgba(0,0,0,.5); z-index:2; position:relative; }
+@keyframes spin{ to{ transform:rotate(360deg);} }
+@keyframes ringPulse{ 0%{ transform:scale(.5); opacity:1;} 100%{ transform:scale(1.4); opacity:0;} }
+.dest-pin-wrap{ filter:drop-shadow(0 8px 16px rgba(255,45,85,.5)); animation:pinDrop .5s cubic-bezier(.34,1.56,.64,1); }
+.dest-pin{ width:44px; height:52px; position:relative; }
+.dest-pin svg{ width:100%; height:100%; }
+.pin-bounce{ animation:pinBounce 2s ease-in-out infinite; transform-origin:bottom center; }
+@keyframes pinDrop{ 0%{ transform:translateY(-80px) scale(.5); opacity:0;} 100%{ transform:translateY(0) scale(1); opacity:1;} }
+@keyframes pinBounce{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-6px);} }
+#bottomSheet{ transition:transform .45s cubic-bezier(.32,.72,.24,1), max-height .45s ease; max-height:78vh; }
+#bottomSheet.collapsed{ transform:translateY(calc(100% - 86px)); }
+@media(min-width:768px){ #bottomSheet{ transform:none!important; max-height:none!important; } #bottomSheet.collapsed{ transform:none!important; }}
+.sheet-scroll{ overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(99,102,241,.4) transparent; }
+.sheet-scroll::-webkit-scrollbar{ width:4px; } .sheet-scroll::-webkit-scrollbar-thumb{ background:rgba(99,102,241,.4); border-radius:99px; }
+input[type=range]{ -webkit-appearance:none; width:100%; height:8px; border-radius:99px; background:linear-gradient(90deg,#6366f1,#22d3ee,#a3e635); outline:none; }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid #6366f1; box-shadow:0 4px 16px rgba(99,102,241,.6); cursor:pointer; transition:transform .15s; }
+input[type=range]::-webkit-slider-thumb:active{ transform:scale(1.2); }
+input[type=range]::-moz-range-thumb{ width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid #6366f1; cursor:pointer; }
+#alarmOverlay{ display:none; }
+#alarmOverlay.active{ display:flex; }
+.alarm-bg{ position:absolute; inset:0; background:radial-gradient(circle at 50% 30%, #ff2d55 0%, #9f1239 45%, #0a0f1e 100%); animation:alarmFlash 1s ease-in-out infinite; }
+@keyframes alarmFlash{ 0%,100%{ opacity:1; filter:brightness(1);} 50%{ opacity:.85; filter:brightness(1.4);} }
+.alarm-ring{ animation:alarmShake .6s ease-in-out infinite; }
+@keyframes alarmShake{ 0%,100%{ transform:rotate(-8deg) scale(1);} 25%{ transform:rotate(8deg) scale(1.1);} 50%{ transform:rotate(-8deg) scale(1);} 75%{ transform:rotate(8deg) scale(1.1);} }
+.flash-bar{ animation:flashSlide 1.2s linear infinite; }
+@keyframes flashSlide{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(200%);} }
+.strobe{ position:absolute; inset:0; pointer-events:none; border:6px solid #fff; opacity:0; animation:strobe .8s step-end infinite; border-radius:0; }
+@keyframes strobe{ 0%,49%{ opacity:0;} 50%,100%{ opacity:.9;} }
+.btn-primary{ background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%); box-shadow:0 8px 30px rgba(99,102,241,.5), inset 0 1px 0 rgba(255,255,255,.3); transition:.2s; position:relative; overflow:hidden; }
+.btn-primary::after{ content:''; position:absolute; top:0; left:-100%; width:60%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent); transform:skewX(-20deg); animation:shine 3s infinite; }
+@keyframes shine{ 0%{ left:-100%;} 50%,100%{ left:200%;} }
+.btn-primary:active{ transform:scale(.97); }
+.btn-primary:disabled{ opacity:.4; filter:grayscale(1); box-shadow:none; } .btn-primary:disabled::after{ display:none; }
+.btn-alert{ background:#fff; color:#be123c; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+.radius-pill{ transition:.2s; cursor:pointer; } .radius-pill.active{ background:linear-gradient(135deg,#6366f1,#22d3ee); color:#fff; border-color:transparent; box-shadow:0 4px 20px rgba(99,102,241,.5); transform:scale(1.05); }
+.alarm-type{ transition:.2s; cursor:pointer; } .alarm-type.active{ border-color:#6366f1; background:rgba(99,102,241,.15); box-shadow:0 0 0 2px rgba(99,102,241,.4); }
+.toggle{ width:48px; height:28px; border-radius:99px; background:rgba(148,163,184,.3); position:relative; transition:.25s; cursor:pointer; flex-shrink:0; }
+.toggle::after{ content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:.25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 2px 8px rgba(0,0,0,.3); }
+.toggle.on{ background:linear-gradient(90deg,#22d3ee,#6366f1); } .toggle.on::after{ left:23px; }
+.live-dot{ width:10px; height:10px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 0 rgba(34,197,94,.7); animation:livePulse 1.5s infinite; }
+@keyframes livePulse{ 70%{ box-shadow:0 0 0 10px rgba(34,197,94,0);} 100%{ box-shadow:0 0 0 0 rgba(34,197,94,0);} }
+#compassArrow{ transition:transform .6s cubic-bezier(.34,1.3,.64,1); }
+#searchResults{ max-height:240px; overflow-y:auto; }
+.search-item{ transition:.15s; } .search-item:hover,.search-item:active{ background:rgba(99,102,241,.15); }
+.toast{ animation:toastIn .4s cubic-bezier(.34,1.56,.64,1); }
+@keyframes toastIn{ from{ transform:translateY(20px) scale(.9); opacity:0;} to{ transform:translateY(0) scale(1); opacity:1;} }
+.toast.out{ animation:toastOut .3s ease forwards; }
+@keyframes toastOut{ to{ transform:translateY(20px); opacity:0;} }
+#trackingProgress{ transition:width .8s ease, background .3s; }
+#codeModal{ display:none; } #codeModal.open{ display:flex; }
+.code-tab{ transition:.2s; } .code-tab.active{ background:rgba(99,102,241,.2); color:#fff; border-color:rgba(99,102,241,.5); }
+html[data-theme="light"] .code-tab.active{ color:#4f46e5; }
+pre.code{ font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.7; tab-size:2; }
+.code-keyword{ color:#c084fc; } .code-string{ color:#86efac; } .code-comment{ color:#64748b; font-style:italic; } .code-func{ color:#67e8f9; } .code-num{ color:#fbbf24; }
+#onboarding{ display:flex; } #onboarding.hidden2{ display:none; }
+.slide{ display:none; } .slide.active{ display:block; animation:toastIn .5s ease; }
+.eq{ display:flex; gap:3px; align-items:end; height:18px; } .eq span{ width:4px; background:#22d3ee; border-radius:99px; animation:eq .8s ease-in-out infinite; } .eq span:nth-child(2){ animation-delay:.15s; background:#6366f1;} .eq span:nth-child(3){ animation-delay:.3s; background:#d946ef;} @keyframes eq{ 0%,100%{ height:6px;} 50%{ height:18px;} }
+.safe-bottom{ padding-bottom:env(safe-area-inset-bottom, 12px); }
+.leaflet-marker-icon{ background:transparent!important; border:none!important; }
+.map-crosshair{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:500; opacity:0; transition:.3s; }
+body.placing .map-crosshair{ opacity:1; }
+/* Unity Interstitial */
+#unityInterstitial{ display:none; }
+#unityInterstitial.active{ display:flex; }
+.unity-glow{ box-shadow:0 0 50px rgba(99,102,241,.45), 0 25px 70px rgba(0,0,0,.7); }
+.ad-creative-bg{ background: radial-gradient(circle at 30% 20%, rgba(99,102,241,.45), transparent 60%), radial-gradient(circle at 80% 80%, rgba(34,211,238,.35), transparent 50%), linear-gradient(135deg,#0f172a 0%,#1e1b4b 55%,#020617 100%); }
+.adProgressTrack{ height:4px; background:rgba(255,255,255,.12); border-radius:99px; overflow:hidden; }
+.adProgressFill{ height:100%; background:linear-gradient(90deg,#6366f1,#22d3ee,#a3e635); transition:width 1s linear; }
+.skip-pulse{ animation:skipPulse 1.2s ease-in-out infinite; }
+@keyframes skipPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(99,102,241,.5);} 50%{ box-shadow:0 0 0 10px rgba(99,102,241,0);} }
+.unity-badge{ background:linear-gradient(90deg,#6366f1,#22d3ee); }
 </style>
 </head>
 <body>
-<div id="root"></div>
+<!-- MAP -->
+<div id="map"></div>
+<div class="map-crosshair">
+<div class="w-12 h-12 rounded-full border-2 border-dashed border-white/70 flex items-center justify-center bg-black/20 backdrop-blur">
+<div class="w-2 h-2 rounded-full bg-[#ff2d55]"></div>
+</div>
+</div>
+<!-- TOP BAR -->
+<header class="absolute top-0 left-0 right-0 z-[1000] p-3 md:p-5 pointer-events-none">
+<div class="max-w-2xl mx-auto md:mx-0 md:max-w-md pointer-events-auto">
+<div class="flex items-center gap-2 mb-2">
+<div class="glass rounded-2xl px-3 py-2 flex items-center gap-2 shrink-0">
+<div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-glow">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+</div>
+<div class="leading-none">
+<div class="font-display font-700 font-bold text-[15px] tracking-tight">ARRIVA</div>
+<div class="text-[10px] text-dim font-semibold tracking-widest uppercase">Alerte GPS</div>
+</div>
+</div>
+<div class="flex gap-2 ml-auto">
+<button id="themeBtn" title="Thème carte" class="glass w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition hover:bg-white/10">
+<svg id="themeIconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+<svg id="themeIconSun" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+</button>
+<button id="codeBtn" title="Voir le code React/Vite" class="glass h-10 px-3 rounded-xl flex items-center gap-2 active:scale-95 transition text-[13px] font-bold hover:bg-white/10">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>
+<span class="hidden sm:inline">Code React</span>
+</button>
+</div>
+</div>
+<div class="glass rounded-2xl overflow-visible relative shadow-xl">
+<div class="flex items-center gap-2 px-3 py-2.5">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+<input id="searchInput" type="text" placeholder="Rechercher une gare, adresse, lieu..." autocomplete="off" class="bg-transparent outline-none flex-1 text-[14px] font-medium placeholder:text-slate-400 min-w-0" style="color:var(--text-main)">
+<button id="searchClear" class="hidden w-7 h-7 rounded-lg chip items-center justify-center text-sm">✕</button>
+<div id="searchSpinner" class="hidden w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+</div>
+<div id="searchResults" class="hidden absolute top-full left-0 right-0 mt-2 glass-strong rounded-2xl overflow-hidden shadow-2xl border"></div>
+</div>
+<div class="flex gap-2 mt-2 flex-wrap">
+<div id="gpsBadge" class="glass rounded-full px-3 py-1.5 text-[11px] font-bold flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse" id="gpsDot"></span>
+<span id="gpsText">Localisation...</span>
+</div>
+<div id="destBadge" class="glass rounded-full px-3 py-1.5 text-[11px] font-bold hidden items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-[#ff2d55]"></span><span id="destBadgeText">Destination définie</span>
+</div>
+<div id="unityMiniBadge" class="glass rounded-full px-3 py-1.5 text-[11px] font-bold flex items-center gap-1.5 border-indigo-500/30">
+<span id="unityMiniDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+<span id="unityMiniText">Unity Ads • BP_Interstitial</span>
+</div>
+</div>
+</div>
+</header>
+<!-- RIGHT MAP CONTROLS -->
+<div class="absolute right-3 md:right-5 top-[190px] md:top-[210px] z-[1000] flex flex-col gap-2">
+<button id="locateBtn" class="glass w-11 h-11 rounded-2xl flex items-center justify-center active:scale-90 transition shadow-lg relative overflow-hidden" title="Me centrer">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+</button>
+<button id="fitBtn" class="glass w-11 h-11 rounded-2xl hidden items-center justify-center active:scale-90 transition" title="Voir trajet">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M16 21h3a2 2 0 0 0 2-2v-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+</button>
+<button id="zoomIn" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-90 transition">+</button>
+<button id="zoomOut" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-90 transition">−</button>
+</div>
+<!-- LIVE MINI COMPASS (during tracking) -->
+<div id="miniCompass" class="hidden absolute left-3 md:left-5 top-[190px] md:top-[210px] z-[1000] glass rounded-2xl p-3 w-[86px] text-center shadow-xl">
+<div class="relative w-14 h-14 mx-auto rounded-full chip flex items-center justify-center overflow-hidden">
+<div class="absolute text-[9px] font-black top-1 text-dim">N</div>
+<svg id="compassArrow" width="28" height="28" viewBox="0 0 24 24" fill="#ff2d55"><path d="M12 2 19 21l-7-4-7 4z"/></svg>
+</div>
+<div id="compassDist" class="mt-1.5 text-[12px] font-display font-bold">—</div>
+<div class="text-[9px] text-dim font-bold uppercase tracking-wider">restants</div>
+</div>
+<!-- BOTTOM SHEET -->
+<div id="bottomSheet" class="absolute bottom-0 left-0 right-0 md:left-5 md:right-auto md:bottom-5 md:w-[400px] z-[1001]">
+<div class="glass md:rounded-3xl rounded-t-[26px] border-b-0 md:border-b overflow-hidden shadow-2xl">
+<button id="sheetHandle" class="w-full pt-2.5 pb-1 flex flex-col items-center gap-1 cursor-pointer md:cursor-default">
+<div class="w-11 h-1.5 rounded-full bg-slate-400/50 md:hidden"></div>
+<div id="sheetHint" class="text-[10px] font-bold tracking-[.18em] uppercase text-dim md:hidden">Glisser pour voir la carte</div>
+</button>
+<div class="sheet-scroll px-4 md:px-5 pb-4 safe-bottom" style="max-height:calc(78vh - 50px)">
+<!-- ============ SETUP PANEL ============ -->
+<div id="panelSetup">
+<!-- Step 1 destination -->
+<div class="flex items-center gap-2 mb-2">
+<span class="w-6 h-6 rounded-lg bg-gradient-to-br from-[#ff2d55] to-[#ff7a45] text-white text-[12px] font-black flex items-center justify-center">1</span>
+<h2 class="font-display font-bold text-[15px]">Destination</h2>
+<span class="ml-auto text-[11px] text-dim font-semibold hidden sm:block">Touchez la carte 📍</span>
+</div>
+<div id="noDestCard" class="rounded-2xl border-2 border-dashed p-4 text-center transition" style="border-color:var(--border); background:var(--bg-chip)">
+<div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-[#ff2d55]/20 to-purple-500/20 flex items-center justify-center mb-2 border" style="border-color:var(--border)">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff2d55" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
+</div>
+<p class="text-[13px] font-bold">Touchez la carte pour poser votre épingle</p>
+<p class="text-[12px] text-dim mt-0.5">ou recherchez un lieu ci-dessus</p>
+<button id="demoDestBtn" class="mt-3 text-[12px] font-bold px-4 py-2 rounded-xl chip hover:bg-indigo-500/20 transition">✨ Exemple : Gare de Lyon, Paris</button>
+</div>
+<div id="destCard" class="hidden rounded-2xl p-3.5 border border-[#ff2d55]/40 bg-gradient-to-br from-[#ff2d55]/12 to-purple-500/10">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff2d55] to-[#ff7a45] flex items-center justify-center shrink-0 shadow-alertGlow">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
+</div>
+<div class="flex-1 min-w-0">
+<div id="destName" class="text-[13.5px] font-bold leading-tight truncate">Destination</div>
+<div id="destCoords" class="text-[11px] text-dim font-mono mt-0.5">—</div>
+<div id="destDirectDist" class="text-[12px] font-bold text-cyan-400 mt-1">— à vol d'oiseau</div>
+</div>
+<button id="clearDestBtn" class="w-8 h-8 rounded-lg chip flex items-center justify-center text-[14px] shrink-0 hover:bg-red-500/20">✕</button>
+</div>
+<div class="flex gap-2 mt-3">
+<button id="centerDestBtn" class="flex-1 text-[12px] font-bold py-2 rounded-xl chip">Centrer</button>
+<button id="changeDestBtn" class="flex-1 text-[12px] font-bold py-2 rounded-xl bg-white/10 border border-white/15">Changer sur carte</button>
+</div>
+</div>
+<!-- recent -->
+<div id="recentWrap" class="hidden mt-2">
+<div class="text-[11px] font-bold text-dim uppercase tracking-wider mb-1.5">Récents (session)</div>
+<div id="recentList" class="flex gap-2 overflow-x-auto pb-1"></div>
+</div>
+<!-- Step 2 radius -->
+<div class="flex items-center gap-2 mt-4 mb-2">
+<span class="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 text-white text-[12px] font-black flex items-center justify-center">2</span>
+<h2 class="font-display font-bold text-[15px]">Rayon d'alerte</h2>
+<span id="radiusBig" class="ml-auto font-display font-bold text-[15px] text-cyan-400">500 m</span>
+</div>
+<div class="rounded-2xl p-3.5" style="background:var(--bg-chip); border:1px solid var(--border)">
+<div class="grid grid-cols-4 gap-2 mb-3">
+<button data-radius="200" class="radius-pill chip rounded-xl py-2 text-[12px] font-bold">200m</button>
+<button data-radius="500" class="radius-pill active chip rounded-xl py-2 text-[12px] font-bold">500m</button>
+<button data-radius="1000" class="radius-pill chip rounded-xl py-2 text-[12px] font-bold">1km</button>
+<button data-radius="2000" class="radius-pill chip rounded-xl py-2 text-[12px] font-bold">2km</button>
+</div>
+<input id="radiusSlider" type="range" min="100" max="5000" step="50" value="500">
+<div class="flex justify-between text-[10px] text-dim font-bold mt-1"><span>100m — proche</span><span>5km — large</span></div>
+<p class="text-[11.5px] text-dim mt-2 leading-snug">🔔 L'alarme sonnera <b id="radiusExplain" style="color:var(--text-main)">500 m avant l'arrivée</b>. Idéal : 500m en ville, 1–2km en train/RER.</p>
+</div>
+<!-- Step 3 alarm -->
+<div class="flex items-center gap-2 mt-4 mb-2">
+<span class="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[12px] font-black flex items-center justify-center">3</span>
+<h2 class="font-display font-bold text-[15px]">Alarme & options</h2>
+</div>
+<div class="grid grid-cols-3 gap-2 mb-2">
+<button data-alarm="siren" class="alarm-type active rounded-2xl p-2.5 text-center border" style="background:var(--bg-chip); border-color:var(--border)">
+<div class="text-[20px]">🚨</div><div class="text-[11px] font-bold mt-0.5">Sirène</div><div class="text-[9px] text-dim">Forte</div>
+</button>
+<button data-alarm="urgent" class="alarm-type rounded-2xl p-2.5 text-center border" style="background:var(--bg-chip); border-color:var(--border)">
+<div class="text-[20px]">⏰</div><div class="text-[11px] font-bold mt-0.5">Urgent</div><div class="text-[9px] text-dim">Bips ×3</div>
+</button>
+<button data-alarm="soft" class="alarm-type rounded-2xl p-2.5 text-center border" style="background:var(--bg-chip); border-color:var(--border)">
+<div class="text-[20px]">🔔</div><div class="text-[11px] font-bold mt-0.5">Douce</div><div class="text-[9px] text-dim">Sieste</div>
+</button>
+</div>
+<div class="flex gap-2">
+<button id="testSoundBtn" class="flex-1 rounded-xl py-2.5 text-[12px] font-bold chip flex items-center justify-center gap-2">
+<span id="testSoundIcon">▶</span> Tester le son <span id="testEQ" class="eq hidden"><span></span><span></span><span></span></span>
+</button>
+<div class="flex-1 rounded-xl px-3 py-2 chip flex items-center justify-between">
+<span class="text-[12px] font-bold">📳 Vibration</span><div id="vibToggle" class="toggle on"></div>
+</div>
+</div>
+<div class="rounded-xl px-3 py-2.5 mt-2 chip flex items-center justify-between">
+<div><div class="text-[12px] font-bold">🧪 Mode démo (sans bouger)</div><div class="text-[10.5px] text-dim">Simule un trajet vers la destination</div></div>
+<div id="demoToggle" class="toggle"></div>
+</div>
+<!-- UNITY ADS CARD -->
+<div id="unityCard" class="rounded-2xl p-3.5 mt-3 border border-indigo-500/25 relative overflow-hidden" style="background:linear-gradient(135deg, rgba(99,102,241,.14), rgba(34,211,238,.08));">
+<div class="absolute -top-10 -right-10 w-28 h-28 bg-gradient-to-br from-indigo-500/20 to-cyan-400/20 blur-2xl rounded-full pointer-events-none"></div>
+<div class="flex items-center gap-2 mb-2.5">
+<div class="w-8 h-8 rounded-xl unity-badge flex items-center justify-center text-white shadow-glow">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+</div>
+<div class="flex-1">
+<div class="text-[12px] font-black flex items-center gap-1.5 flex-wrap">Unity Ads <span class="px-2 py-0.5 rounded-full bg-[#ff2d55] text-white text-[9px] tracking-widest font-black">INTERSTITIEL</span></div>
+<div class="text-[11px] font-mono font-bold text-indigo-300">BP_Interstitial_Android</div>
+</div>
+<div id="unityToggle" class="toggle on" title="Activer / désactiver les publicités"></div>
+</div>
+<div class="flex items-center gap-2 text-[11px] font-bold">
+<span id="unityReadyDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow"></span>
+<span id="unityReadyText" class="text-dim">Initialisation Unity Ads...</span>
+<span id="unityFreqBadge" class="ml-auto text-[10px] px-2 py-1 rounded-full chip">Test Mode • 1/2min</span>
+</div>
+<div id="unityStatusText" class="text-[11px] text-dim mt-1.5 leading-snug">Chargement du placement interstitiel Android. L'annonce s'affiche avant le démarrage du suivi.</div>
+<div class="flex gap-2 mt-3">
+<button id="testInterstitialBtn" class="flex-1 py-2.5 rounded-xl bg-white text-slate-900 font-black text-[12px] flex items-center justify-center gap-1.5 active:scale-[.98] transition shadow-lg">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Tester l'interstitiel
+</button>
+<button id="unityInfoBtn" class="px-3 py-2.5 rounded-xl chip text-[11px] font-bold">ℹ️ Infos</button>
+</div>
+</div>
+<button id="startBtn" disabled class="btn-primary w-full mt-4 rounded-2xl py-4 font-display font-bold text-[16px] text-white flex items-center justify-center gap-2">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Démarrer le suivi du trajet
+</button>
+<p id="startHint" class="text-center text-[11.5px] text-dim mt-2 font-semibold">Définissez une destination pour activer le suivi</p>
+<p class="text-center text-[10px] text-dim mt-2 opacity-70">100% front-end • Aucune donnée envoyée • GPS navigateur + Leaflet + OSM</p>
+</div>
+<!-- ============ TRACKING PANEL ============ -->
+<div id="panelTracking" class="hidden">
+<div class="flex items-center gap-2 mb-3">
+<div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40">
+<span class="live-dot"></span><span class="text-[11px] font-black tracking-widest text-green-400">SUIVI ACTIF</span>
+</div>
+<div class="ml-auto text-right">
+<div id="elapsedTime" class="font-mono font-bold text-[14px]">00:00</div>
+<div id="trackAccuracy" class="text-[10px] text-dim font-bold">GPS ±—</div>
+</div>
+</div>
+<div class="rounded-3xl p-5 text-center relative overflow-hidden border border-indigo-500/30" style="background:linear-gradient(135deg, rgba(99,102,241,.18), rgba(34,211,238,.1))">
+<div class="text-[11px] font-bold tracking-[.2em] uppercase text-dim">Distance restante</div>
+<div id="liveDistance" class="font-display font-bold text-[52px] leading-none mt-1 tracking-tight">—</div>
+<div id="liveSub" class="text-[12.5px] text-dim font-semibold mt-1.5">Calcul...</div>
+<div class="mt-3 h-2.5 rounded-full overflow-hidden bg-black/30 border border-white/10">
+<div id="trackingProgress" class="h-full rounded-full" style="width:0%; background:linear-gradient(90deg,#6366f1,#22d3ee)"></div>
+</div>
+<div class="flex justify-between mt-1.5 text-[10px] font-bold text-dim"><span>DÉPART</span><span id="progressPct">0%</span><span id="progressTarget">ALERTE À 500M</span></div>
+<div id="insideBadge" class="hidden mt-2 inline-block px-3 py-1 rounded-full bg-[#ff2d55] text-white text-[11px] font-black animate-pulse">📍 DANS LA ZONE D'ALERTE</div>
+</div>
+<div class="grid grid-cols-4 gap-2 mt-3">
+<div class="rounded-2xl p-2.5 text-center" style="background:var(--bg-chip); border:1px solid var(--border)">
+<div id="statSpeed" class="font-display font-bold text-[15px]">0</div><div class="text-[9px] text-dim font-bold uppercase">km/h</div>
+</div>
+<div class="rounded-2xl p-2.5 text-center" style="background:var(--bg-chip); border:1px solid var(--border)">
+<div id="statCap" class="font-display font-bold text-[15px]">—</div><div class="text-[9px] text-dim font-bold uppercase">Cap</div>
+</div>
+<div class="rounded-2xl p-2.5 text-center" style="background:var(--bg-chip); border:1px solid var(--border)">
+<div id="statEta" class="font-display font-bold text-[15px]">—</div><div class="text-[9px] text-dim font-bold uppercase">ETA</div>
+</div>
+<div class="rounded-2xl p-2.5 text-center" style="background:var(--bg-chip); border:1px solid var(--border)">
+<div id="statRadius" class="font-display font-bold text-[15px]">500m</div><div class="text-[9px] text-dim font-bold uppercase">Rayon</div>
+</div>
+</div>
+<div class="rounded-2xl p-3 mt-2 flex items-center gap-3" style="background:var(--bg-chip); border:1px solid var(--border)">
+<div class="w-10 h-10 rounded-full chip flex items-center justify-center shrink-0 overflow-hidden relative">
+<svg id="panelArrow" width="22" height="22" viewBox="0 0 24 24" fill="#22d3ee" style="transition:transform .5s"><path d="M12 2 19 21l-7-4-7 4z"/></svg>
+</div>
+<div class="flex-1">
+<div class="text-[12px] font-bold" id="headingText">Direction : —</div>
+<input id="radiusSliderLive" type="range" min="100" max="5000" step="50" value="500" class="mt-1.5" style="height:6px">
+</div>
+</div>
+<div id="wakeInfo" class="hidden mt-2 text-[11px] font-bold text-green-400 flex items-center gap-1.5">🔆 Écran maintenu allumé pendant le suivi</div>
+<div class="flex gap-2 mt-3">
+<button id="muteBtn" class="flex-1 rounded-2xl py-3.5 text-[13px] font-bold chip">🔕 Couper son</button>
+<button id="stopBtn" class="flex-[2] rounded-2xl py-3.5 font-display font-bold text-[14px] text-white bg-gradient-to-r from-[#ff2d55] to-[#ff6b4a] shadow-alertGlow active:scale-[.98] transition flex items-center justify-center gap-2">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Arrêter le suivi
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- UNITY INTERSTITIAL OVERLAY -->
+<div id="unityInterstitial" class="fixed inset-0 items-center justify-center p-4 bg-black/80 backdrop-blur-xl" style="z-index:2600;">
+<div class="unity-card unity-glow w-full max-w-sm rounded-[28px] overflow-hidden relative border border-white/15">
+<div class="flex items-center justify-between px-4 py-3 bg-white/[.06] border-b border-white/10">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center shadow">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+</div>
+<div>
+<div class="text-[11px] font-black tracking-[.14em] text-white leading-none">UNITY ADS</div>
+<div class="text-[10px] font-bold text-white/60 font-mono">BP_Interstitial_Android</div>
+</div>
+</div>
+<button id="closeAdBtn" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition border border-white/10">✕</button>
+</div>
+<div class="adProgressTrack mx-4 mt-3"><div id="adProgress" class="adProgressFill" style="width:100%"></div></div>
+<div class="ad-creative-bg m-4 rounded-[22px] p-5 text-center relative overflow-hidden border border-white/10">
+<div class="absolute -top-10 -right-10 w-36 h-36 bg-gradient-to-br from-fuchsia-500/30 to-indigo-500/30 blur-2xl rounded-full"></div>
+<div class="absolute -bottom-12 -left-12 w-32 h-32 bg-gradient-to-br from-cyan-400/25 to-blue-500/25 blur-2xl rounded-full"></div>
+<div class="relative">
+<div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-2xl shadow-xl border border-white/20">🚀</div>
+<div class="inline-flex items-center gap-1 mt-3 px-2.5 py-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-black tracking-widest">★ OFFRE LIMITÉE ★</div>
+<h3 class="font-display font-bold text-[22px] text-white mt-2 leading-[1.1]">Passez Premium<br><span class="bg-gradient-to-r from-cyan-300 to-indigo-400 bg-clip-text text-transparent">et voyagez serein</span></h3>
+<p class="text-[12.5px] text-slate-300 mt-2.5 leading-relaxed">Alertes illimitées, mode hors-ligne complet et vibrations personnalisées. <b class="text-white">-30% cette semaine</b> sur ARRIVA Premium.</p>
+<div class="flex items-center justify-center gap-1.5 mt-3">
+<div class="flex text-amber-400 text-[12px]">★★★★★</div><span class="text-[11px] font-bold text-white">4.8/5</span><span class="text-[11px] text-white/60">• 12k avis • Gratuit</span>
+</div>
+<button id="adCtaBtn" class="mt-4 w-full py-3.5 rounded-2xl bg-white text-slate-900 font-black text-[14px] flex items-center justify-center gap-2 active:scale-[.98] transition shadow-xl">
+<span>Installer Premium</span><span class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-[12px]">↗</span>
+</button>
+<div class="flex items-center justify-center gap-2 mt-2.5">
+<span class="text-[9px] font-bold tracking-[.16em] text-white/50 uppercase">Publicité</span><span class="w-1 h-1 rounded-full bg-white/30"></span><span class="text-[9px] font-bold tracking-[.16em] text-white/50 uppercase">Unity Ads • Test Mode</span>
+</div>
+</div>
+</div>
+<div class="px-4 pb-4">
+<div class="flex gap-2">
+<button id="skipAdBtn" disabled class="flex-1 py-3.5 rounded-2xl bg-white/10 border border-white/20 text-white font-bold text-[13px] flex items-center justify-center gap-2 opacity-60">
+<span>Passer dans</span><span id="skipCount" class="bg-white text-slate-900 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-black">5</span><span>s</span>
+</button>
+<div class="hidden sm:flex items-center gap-1.5 px-3 rounded-2xl chip text-[10px] font-bold"><span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> Android</div>
+</div>
+<p class="text-center text-[10px] text-white/40 mt-2.5 font-medium">BP_Interstitial_Android • ID: 1234567 • Ne sera plus affiché avant 2 min</p>
+</div>
+</div>
+</div>
+<!-- ALARM OVERLAY -->
+<div id="alarmOverlay" class="fixed inset-0 items-center justify-center p-5" style="z-index:3000;">
+<div class="alarm-bg"></div>
+<div class="strobe"></div>
+<div class="absolute top-0 left-0 right-0 h-2 overflow-hidden bg-black/40"><div class="flash-bar h-full w-1/2 bg-white/90"></div></div>
+<div class="relative w-full max-w-md text-center text-white">
+<div class="alarm-ring inline-flex w-24 h-24 rounded-full bg-white items-center justify-center shadow-2xl mb-4">
+<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+</div>
+<div class="inline-block px-4 py-1 rounded-full bg-white/20 border border-white/40 text-[11px] font-black tracking-[.25em] mb-3 backdrop-blur">⚠ ALERTE PROXIMITÉ ⚠</div>
+<h1 class="font-display font-bold text-[34px] sm:text-[42px] leading-[1.05] drop-shadow-2xl">Vous arrivez<br>à destination !</h1>
+<div class="mt-4 inline-flex items-center gap-3 bg-black/40 backdrop-blur-xl rounded-2xl px-6 py-3 border border-white/30">
+<div><div id="alarmDistance" class="font-display font-bold text-[30px] leading-none">0 m</div><div class="text-[11px] font-bold opacity-80 tracking-widest mt-1">DISTANCE RESTANTE</div></div>
+</div>
+<p id="alarmDest" class="mt-3 text-[14px] font-semibold opacity-90 truncate px-4">—</p>
+<div class="flex items-center justify-center gap-2 mt-2 text-[12px] font-bold opacity-90"><span class="eq"><span style="background:#fff"></span><span style="background:#fff"></span><span style="background:#fff"></span></span> Alarme sonore + vibration actives</div>
+<div class="grid gap-2.5 mt-6">
+<button id="alarmStopAll" class="btn-alert rounded-2xl py-4 font-display font-bold text-[16px] active:scale-[.98] transition">■ Arrêter l'alarme et le suivi</button>
+<button id="alarmContinue" class="rounded-2xl py-3.5 font-bold text-[14px] bg-white/15 border-2 border-white/50 backdrop-blur active:scale-[.98] transition">Continuer jusqu'à l'arrêt (couper le son)</button>
+</div>
+<p class="mt-3 text-[11px] opacity-70 font-semibold">Préparez-vous à descendre • Vérifiez vos affaires</p>
+</div>
+</div>
+<!-- ONBOARDING -->
+<div id="onboarding" class="fixed inset-0 z-[1800] items-center justify-center p-5 bg-black/70 backdrop-blur-md">
+<div class="glass-strong rounded-3xl max-w-sm w-full p-6 relative overflow-hidden shadow-2xl" style="background:linear-gradient(160deg,#131b3d,#0a0f1e)">
+<div class="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-gradient-to-br from-indigo-500/40 to-pink-500/30 blur-3xl"></div>
+<button id="onboardSkip" class="absolute top-4 right-4 text-[12px] font-bold text-slate-400 hover:text-white px-3 py-1.5">Passer ✕</button>
+<div class="relative">
+<div class="slide active" data-slide="0">
+<div class="text-[52px] mb-3">😴🚇</div>
+<h2 class="font-display font-bold text-[24px] text-white leading-tight">Dormez tranquille,<br><span class="bg-gradient-to-r from-indigo-400 to-cyan-300 bg-clip-text text-transparent">on vous réveille à l'arrêt.</span></h2>
+<p class="text-slate-400 text-[14px] mt-3 leading-relaxed">ARRIVA surveille votre position GPS et déclenche une <b class="text-white">alarme sonore + vibration</b> avant votre destination.</p>
+</div>
+<div class="slide" data-slide="1">
+<div class="text-[52px] mb-3">📍🗺️</div>
+<h2 class="font-display font-bold text-[24px] text-white leading-tight">1. Touchez la carte<br><span class="text-[#ff7a9a]">pour poser votre épingle</span></h2>
+<p class="text-slate-400 text-[14px] mt-3 leading-relaxed">Cliquez n'importe où, ou recherchez une gare / adresse. Un cercle montre votre <b class="text-white">zone d'alerte</b>.</p>
+</div>
+<div class="slide" data-slide="2">
+<div class="text-[52px] mb-3">⏱️🔔</div>
+<h2 class="font-display font-bold text-[24px] text-white leading-tight">2. Réglez le rayon<br><span class="text-cyan-300">puis démarrez le suivi</span></h2>
+<p class="text-slate-400 text-[14px] mt-3 leading-relaxed">200m en bus, 500m en métro, 1–2km en train. Le calcul <b class="text-white">Haversine</b> tourne en temps réel, 100% hors-ligne côté calcul.</p>
+</div>
+<div class="flex gap-1.5 mt-5 justify-center" id="onboardDots">
+<div class="h-1.5 rounded-full bg-white transition-all dot" style="width:24px"></div>
+<div class="h-1.5 rounded-full bg-white/25 transition-all dot" style="width:8px"></div>
+<div class="h-1.5 rounded-full bg-white/25 transition-all dot" style="width:8px"></div>
+</div>
+<div class="flex gap-2 mt-4">
+<button id="onboardNext" class="btn-primary flex-1 rounded-2xl py-3.5 font-bold text-white text-[15px]">Suivant →</button>
+</div>
+<button id="gpsEnableBtn" class="w-full mt-2 rounded-2xl py-3 text-[13px] font-bold bg-white/10 border border-white/15 text-white">📡 Activer ma position GPS</button>
+<p class="text-center text-[10px] text-slate-500 mt-2">Astuce : essayez le <b>mode démo</b> si vous êtes sur ordinateur.</p>
+</div>
+</div>
+</div>
+<!-- CODE MODAL (React/Vite deliverable) -->
+<div id="codeModal" class="fixed inset-0 z-[1900] items-center justify-center p-3 md:p-6 bg-black/75 backdrop-blur-md">
+<div class="w-full max-w-4xl h-[88vh] rounded-3xl overflow-hidden flex flex-col border border-white/15 shadow-2xl" style="background:#0b1126">
+<div class="flex items-center gap-3 px-5 py-4 border-b border-white/10 bg-white/[.03]">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-600 flex items-center justify-center font-mono font-bold text-white">&lt;/&gt;</div>
+<div class="flex-1 min-w-0">
+<div class="font-display font-bold text-white text-[16px]">Projet Vite + React + Tailwind — Code complet</div>
+<div class="text-[12px] text-slate-400">Prêt à copier • modulaire • commenté • 100% front-end</div>
+</div>
+<button id="copyCodeBtn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-bold transition flex items-center gap-1.5">⧉ Copier</button>
+<button id="codeClose" class="w-9 h-9 rounded-xl bg-white/10 text-white flex items-center justify-center hover:bg-white/20">✕</button>
+</div>
+<div class="flex gap-2 px-5 py-3 overflow-x-auto border-b border-white/10 bg-black/30" id="codeTabs">
+<button data-file="install" class="code-tab active whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">⚙️ install.md</button>
+<button data-file="geo" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">📐 utils/geo.js</button>
+<button data-file="map" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">🗺️ MapComponent.jsx</button>
+<button data-file="alert" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">🔔 AlertControl.jsx</button>
+<button data-file="app" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">⚛️ App.jsx</button>
+<button data-file="unity" class="code-tab whitespace-nowrap px-3.5 py-1.5 rounded-lg border border-white/10 text-[12px] font-mono font-bold text-slate-300">📺 UnityAds.jsx</button>
+</div>
+<div class="flex-1 overflow-auto p-5 bg-[#070b1c]"><pre class="code text-slate-200 whitespace-pre-wrap break-words" id="codeContent"></pre></div>
+<div class="px-5 py-3 border-t border-white/10 bg-white/[.02] text-[11px] text-slate-400 font-semibold">💡 Cette démo single-file ci-dessus est la version compilée fonctionnelle. Copiez les fichiers React dans votre projet Vite pour la version modulaire. Unity Ads : voir onglet UnityAds.jsx</div>
+</div>
+</div>
+<!-- TOASTS -->
+<div id="toasts" class="fixed top-[150px] md:top-5 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-5 z-[3200] flex flex-col gap-2 items-center md:items-end pointer-events-none w-[92%] md:w-auto"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const state = { userPos: null, accuracy: null, speed: null, heading: null, destPos: null, destName: '', radius: 500, tracking: false, watchId: null, alarmActive: false, alarmMuted: false, alarmType: 'siren', vibration: true, demo: false, demoTimer: null, initialDistance: null, startTime: null, elapsedTimer: null, recent: [], wakeLock: null, changingDest: false, };
+const toRad = d => d * Math.PI / 180;
+function haversineDistance(a, b){ if(!a || !b) return null; const R = 6371000; const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng); const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2; return 2 * R * Math.asin(Math.sqrt(s));}
+function calculateBearing(a,b){ const dLng = toRad(b.lng-a.lng); const y = Math.sin(dLng)*Math.cos(toRad(b.lat)); const x = Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat)) - Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(dLng); return (Math.atan2(y,x)*180/Math.PI + 360) % 360;}
+function formatDistance(m){ if(m==null) return '—'; if(m < 1000) return `${Math.round(m)} m`; if(m < 10000) return `${(m/1000).toFixed(2)} km`; return `${(m/1000).toFixed(1)} km`;}
+function formatShort(m){ if(m==null) return '—'; if(m<1000) return `${Math.round(m)}m`; return `${(m/1000).toFixed(m<10000?2:1)}km`;}
+function compassLabel(deg){ const dirs=['N','NE','E','SE','S','SO','O','NO']; return dirs[Math.round(deg/45)%8];}
+function moveTowards(from, to, meters){ const dist = haversineDistance(from,to); if(!dist || dist===0) return {...to}; const f = Math.min(1, meters/dist); return { lat: from.lat + (to.lat-from.lat)*f, lng: from.lng + (to.lng-from.lng)*f };}
+function toast(msg, type='info'){ const colors = { info:'border-indigo-500/40', success:'border-green-500/50', warn:'border-amber-500/50', error:'border-red-500/50' }; const icons = { info:'💡', success:'✅', warn:'⚠️', error:'❌' }; const el = document.createElement('div'); el.className = `toast glass rounded-2xl px-4 py-3 text-[13px] font-bold border pointer-events-auto shadow-2xl flex items-center gap-2 max-w-sm ${colors[type]}`; el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`; $('toasts').appendChild(el); setTimeout(()=>{ el.classList.add('out'); setTimeout(()=>el.remove(),300); }, 3400);}
 
-<script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+/* ---------- UNITY ADS BP_Interstitial_Android (mock SDK) ---------- */
+const unityState = {
+  enabled: true,
+  initialized: false,
+  loading: false,
+  ready: false,
+  placementId: 'BP_Interstitial_Android',
+  gameId: '5432107',
+  testMode: true,
+  lastShown: 0
+};
+let unitySkipTimer=null, unityCountdown=5, unityInterstitialCallback=null;
+function updateUnityUI(){
+  const dot=$('unityReadyDot'), txt=$('unityReadyText'), miniDot=$('unityMiniDot'), miniTxt=$('unityMiniText'), status=$('unityStatusText'), btn=$('testInterstitialBtn');
+  if(!dot) return;
+  if(!unityState.enabled){
+    dot.className='w-2.5 h-2.5 rounded-full bg-slate-400';
+    txt.textContent='Publicités désactivées';
+    txt.className='text-dim';
+    if(miniDot) miniDot.className='w-2 h-2 rounded-full bg-slate-400';
+    if(miniTxt) miniTxt.textContent='Unity Ads • Désactivé';
+    if(status) status.textContent='Activez les publicités pour monétiser avec l\'interstitiel Android.';
+    if(btn) { btn.disabled=true; btn.classList.add('opacity-40','pointer-events-none'); btn.innerHTML='Interstitiel désactivé'; }
+    $('unityToggle')?.classList.remove('on');
+    return;
+  }
+  $('unityToggle')?.classList.add('on');
+  if(btn){ btn.disabled=false; btn.classList.remove('opacity-40','pointer-events-none'); }
+  if(unityState.loading){
+    dot.className='w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+    txt.textContent='Chargement du placement...';
+    txt.className='text-amber-300';
+    if(miniDot) miniDot.className='w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+    if(miniTxt) miniTxt.textContent='Unity Ads • Chargement...';
+    if(status) status.textContent='Connexion au réseau Unity Ads (test mode)...';
+    if(btn) btn.innerHTML='<span class="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span> Chargement...';
+  } else if(unityState.ready){
+    dot.className='w-2.5 h-2.5 rounded-full bg-green-400 shadow shadow-green-400/50';
+    txt.textContent='✓ Prêt à afficher';
+    txt.className='text-green-400';
+    if(miniDot) miniDot.className='w-2 h-2 rounded-full bg-green-400';
+    if(miniTxt) miniTxt.textContent='Unity Ads • Prêt ✓';
+    if(status) status.textContent='Interstitiel prêt ! Il s\'affichera automatiquement avant le suivi (fréquence 1x/2min).';
+    if(btn) btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Tester l\'interstitiel';
+  } else {
+    dot.className='w-2.5 h-2.5 rounded-full bg-slate-400';
+    txt.textContent='En attente de chargement';
+    txt.className='text-dim';
+    if(btn) btn.innerHTML='Recharger l\'annonce';
+  }
+}
+function initUnityAds(){
+  if(unityState.initialized) return;
+  unityState.loading=true; updateUnityUI();
+  // Simulate UnityAds.initialize(gameId, testMode)
+  setTimeout(()=>{
+    unityState.initialized=true;
+    unityState.loading=false;
+    toast('Unity Ads initialisé — Game ID '+unityState.gameId+' (Test Mode)','success');
+    loadUnityInterstitial();
+  }, 1100);
+}
+function loadUnityInterstitial(){
+  if(!unityState.enabled || !unityState.initialized) return;
+  unityState.loading=true; unityState.ready=false; updateUnityUI();
+  // Simulate UnityAds.load("BP_Interstitial_Android")
+  setTimeout(()=>{
+    unityState.loading=false; unityState.ready=true; updateUnityUI();
+  }, 1400);
+}
+function canShowInterstitial(){
+  if(!unityState.enabled || !unityState.ready) return false;
+  const now=Date.now();
+  if(unityState.lastShown && (now - unityState.lastShown < 120000)) return false;
+  return true;
+}
+function openInterstitialOverlay(cb){
+  unityInterstitialCallback=cb;
+  const el=$('unityInterstitial');
+  el.classList.add('active');
+  const skipBtn=$('skipAdBtn'), prog=$('adProgress');
+  skipBtn.disabled=true; skipBtn.classList.add('opacity-60'); skipBtn.classList.remove('skip-pulse');
+  unityCountdown=5;
+  skipBtn.innerHTML=`<span>Passer dans</span><span id="skipCount" class="bg-white text-slate-900 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-black">5</span><span>s</span>`;
+  if(prog) prog.style.width='100%';
+  clearInterval(unitySkipTimer);
+  unitySkipTimer=setInterval(()=>{
+    unityCountdown--;
+    const c=$('skipCount');
+    if(c) c.textContent=unityCountdown;
+    if(prog) prog.style.width=(unityCountdown/5*100)+'%';
+    if(unityCountdown<=0){
+      clearInterval(unitySkipTimer);
+      skipBtn.disabled=false;
+      skipBtn.classList.remove('opacity-60');
+      skipBtn.classList.add('skip-pulse');
+      skipBtn.innerHTML=`Passer l'annonce ✕`;
+    }
+  },1000);
+}
+function closeInterstitialOverlay(completed=true){
+  clearInterval(unitySkipTimer);
+  $('unityInterstitial').classList.remove('active');
+  const cb=unityInterstitialCallback; unityInterstitialCallback=null;
+  if(completed){
+    toast('Merci d\'avoir regardé la publicité ✨','info');
+  }
+  if(cb) cb(completed);
+  // preload next
+  setTimeout(()=>loadUnityInterstitial(), 800);
+}
+function showUnityInterstitial(onComplete, force=false){
+  if(!unityState.enabled){ if(onComplete) onComplete(); return false; }
+  if(!force && !canShowInterstitial()){
+    const remain=Math.ceil((120000 - (Date.now()-unityState.lastShown))/1000);
+    if(unityState.lastShown && remain>0) toast(`Interstitiel disponible dans ${remain}s (limite 1/2min)`,'warn');
+    if(onComplete) onComplete();
+    return false;
+  }
+  if(!unityState.ready){
+    toast('Publicité pas encore prête — chargement...','warn');
+    loadUnityInterstitial();
+    if(onComplete) onComplete();
+    return false;
+  }
+  unityState.lastShown=Date.now();
+  unityState.ready=false;
+  updateUnityUI();
+  openInterstitialOverlay(onComplete);
+  return true;
+}
 
-/* ============================================================
-   geo.js — Utilitaires GPS
-   Formule de Haversine pour calculer la distance entre deux
-   coordonnées GPS (en mètres).
-   ============================================================ */
+let map, userMarker, destMarker, radiusCircle, accuracyCircle, routeLine;
+let darkTiles, lightTiles, isDarkMap = true;
+const userIcon = L.divIcon({ className:'', html:`<div class="user-wrap"><div class="user-radar"></div><div class="user-pulse-ring"></div><div class="user-dot"></div></div>`, iconSize:[28,28], iconAnchor:[14,14] });
+const destIconHTML = `<div class="dest-pin-wrap"><div class="dest-pin pin-bounce"><svg viewBox="0 0 44 52"><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30s22-14 22-30C44 10 34 0 22 0z" fill="#ff2d55"/><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30V0z" fill="#e11d48"/><circle cx="22" cy="21" r="9" fill="white"/><circle cx="22" cy="21" r="4.5" fill="#ff2d55"/></svg></div></div>`;
+const destIcon = L.divIcon({ className:'', html:destIconHTML, iconSize:[44,52], iconAnchor:[22,50] });
+function initMap(){ map = L.map('map', { zoomControl:false, attributionControl:true }).setView([48.8566, 2.3522], 13); darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19, attribution:'© OpenStreetMap © CARTO' }); lightTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }); darkTiles.addTo(map); map.attributionControl.setPrefix('ARRIVA'); map.on('click', e => { setDestination({lat:e.latlng.lat, lng:e.latlng.lng}); reverseGeocode(e.latlng.lat, e.latlng.lng); }); setTimeout(()=>map.invalidateSize(), 300);}
+function updateUserMarker(){ if(!state.userPos) return; if(!userMarker){ userMarker = L.marker([state.userPos.lat, state.userPos.lng], {icon:userIcon, zIndexOffset:1000}).addTo(map); } else userMarker.setLatLng([state.userPos.lat, state.userPos.lng]); if(state.accuracy){ if(!accuracyCircle) accuracyCircle = L.circle([state.userPos.lat,state.userPos.lng], {radius:state.accuracy, color:'#22d3ee', weight:1, opacity:.5, fillColor:'#22d3ee', fillOpacity:.08}).addTo(map); else { accuracyCircle.setLatLng([state.userPos.lat,state.userPos.lng]); accuracyCircle.setRadius(state.accuracy); } } updateRouteLine();}
+function updateDestLayers(){ if(destMarker){ map.removeLayer(destMarker); destMarker=null; } if(radiusCircle){ map.removeLayer(radiusCircle); radiusCircle=null; } if(state.destPos){ destMarker = L.marker([state.destPos.lat, state.destPos.lng], {icon:destIcon, draggable:true}).addTo(map); destMarker.on('dragend', ()=>{ const p=destMarker.getLatLng(); setDestination({lat:p.lat,lng:p.lng}, true); reverseGeocode(p.lat,p.lng); }); radiusCircle = L.circle([state.destPos.lat,state.destPos.lng], { radius:state.radius, color:'#ff2d55', weight:2.5, opacity:.9, dashArray:'10 7', fillColor:'#ff2d55', fillOpacity:.10 }).addTo(map); } updateRouteLine();}
+function updateRouteLine(){ if(routeLine){ map.removeLayer(routeLine); routeLine=null; } if(state.userPos && state.destPos){ routeLine = L.polyline([[state.userPos.lat,state.userPos.lng],[state.destPos.lat,state.destPos.lng]], { color:'#22d3ee', weight:3, opacity:.75, dashArray:'8 10', lineCap:'round' }).addTo(map); }}
+function setGpsBadge(status, text){ const dot = $('gpsDot'); dot.className = 'w-2 h-2 rounded-full ' + (status==='ok'?'bg-green-400':status==='warn'?'bg-amber-400 animate-pulse':'bg-slate-400 animate-pulse'); $('gpsText').textContent = text;}
+function requestLocation(center=true){ if(!('geolocation' in navigator)){ setGpsBadge('err','GPS non supporté'); toast('Géolocalisation non supportée par ce navigateur','error'); return; } setGpsBadge('warn','Localisation...'); navigator.geolocation.getCurrentPosition( pos => { onPosition(pos, center); toast('Position GPS acquise','success'); }, err => { console.warn(err); setGpsBadge('err','GPS indisponible'); toast('GPS indisponible — centré sur Paris. Activez la localisation ou utilisez le mode démo.','warn'); map.setView([48.8566,2.3522], 13); }, { enableHighAccuracy:true, timeout:12000, maximumAge:5000 } );}
+function onPosition(pos, center=false){ state.userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }; state.accuracy = pos.coords.accuracy || null; state.speed = (pos.coords.speed != null && pos.coords.speed >= 0) ? pos.coords.speed : state.speed; state.heading = pos.coords.heading; updateUserMarker(); setGpsBadge('ok', `GPS ±${Math.round(state.accuracy||15)}m`); $('trackAccuracy').textContent = `GPS ±${Math.round(state.accuracy||15)}m`; if(center) map.flyTo([state.userPos.lat, state.userPos.lng], 15, {duration:1.2}); refreshDistances(); updateStartButton();}
+async function reverseGeocode(lat,lng){ try{ const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr&zoom=16`); const j = await r.json(); if(j && j.display_name){ const short = (j.display_name||'').split(',').slice(0,2).join(',').trim(); state.destName = short || 'Destination personnalisée'; $('destName').textContent = state.destName; $('alarmDest').textContent = '📍 ' + state.destName; } }catch(e){ }}
+function setDestination(latlng, keepName=false){ state.destPos = { lat:+latlng.lat.toFixed(6), lng:+latlng.lng.toFixed(6) }; if(!keepName){ state.destName = 'Épingle personnalisée'; $('destName').textContent = state.destName; $('alarmDest').textContent = '📍 Épingle personnalisée'; } $('noDestCard').classList.add('hidden'); $('destCard').classList.remove('hidden'); $('destCoords').textContent = `${state.destPos.lat.toFixed(5)}, ${state.destPos.lng.toFixed(5)}`; $('destBadge').classList.remove('hidden'); $('destBadge').classList.add('flex'); $('destBadgeText').textContent = state.destName.length>28 ? state.destName.slice(0,28)+'…' : state.destName; $('fitBtn').classList.remove('hidden'); $('fitBtn').classList.add('flex'); updateDestLayers(); refreshDistances(); updateStartButton(); if(state.tracking && state.initialDistance==null) state.initialDistance = haversineDistance(state.userPos, state.destPos);}
+function clearDestination(){ state.destPos=null; state.destName=''; $('noDestCard').classList.remove('hidden'); $('destCard').classList.add('hidden'); $('destBadge').classList.add('hidden'); $('destBadge').classList.remove('flex'); $('fitBtn').classList.add('hidden'); $('fitBtn').classList.remove('flex'); updateDestLayers(); updateStartButton();}
+function pushRecent(name, pos){ if(!name || !pos) return; state.recent = [{name, pos:{...pos}}, ...state.recent.filter(r=>r.name!==name)].slice(0,6); renderRecent();}
+function renderRecent(){ const w=$('recentWrap'), l=$('recentList'); if(!state.recent.length){ w.classList.add('hidden'); return; } w.classList.remove('hidden'); l.innerHTML=''; state.recent.forEach(r=>{ const b=document.createElement('button'); b.className='shrink-0 chip rounded-full px-3 py-1.5 text-[11px] font-bold whitespace-nowrap hover:bg-indigo-500/20 transition'; b.textContent='📍 '+ (r.name.length>22? r.name.slice(0,22)+'…': r.name); b.onclick=()=>{ setDestination(r.pos); state.destName=r.name; $('destName').textContent=r.name; $('alarmDest').textContent='📍 '+r.name; map.flyTo([r.pos.lat,r.pos.lng],15,{duration:1}); }; l.appendChild(b); });}
+function refreshDistances(){ if(state.userPos && state.destPos){ const d = haversineDistance(state.userPos, state.destPos); $('destDirectDist').textContent = `${formatDistance(d)} à vol d'oiseau`; if(state.tracking) updateTrackingUI(d); return d; } return null;}
+let searchTimeout=null;
+$('searchInput').addEventListener('input', e=>{ const q = e.target.value.trim(); $('searchClear').classList.toggle('hidden', !q); $('searchClear').classList.toggle('flex', !!q); clearTimeout(searchTimeout); if(q.length<3){ $('searchResults').classList.add('hidden'); return; } searchTimeout=setTimeout(()=>doSearch(q), 450);});
+async function doSearch(q){ $('searchSpinner').classList.remove('hidden'); try{ const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&accept-language=fr&addressdetails=1`); const arr = await r.json(); const box=$('searchResults'); box.innerHTML=''; if(!arr.length){ box.innerHTML=`<div class="p-4 text-[13px] text-dim font-semibold text-center">Aucun résultat pour « ${q} »</div>`; } else arr.forEach(place=>{ const item=document.createElement('button'); item.className='search-item w-full text-left px-4 py-3 border-b last:border-0 flex gap-3 items-start'; item.style.borderColor='var(--border)'; const short=(place.display_name||'').split(',').slice(0,2).join(','); item.innerHTML=`<div class="w-8 h-8 rounded-lg bg-[#ff2d55]/15 border border-[#ff2d55]/30 flex items-center justify-center shrink-0 text-[15px]">📍</div><div class="min-w-0"><div class="text-[13px] font-bold truncate" style="color:var(--text-main)">${short}</div><div class="text-[11px] text-dim truncate">${place.display_name||''}</div><div class="text-[10px] font-mono text-dim">${(+place.lat).toFixed(4)}, ${(+place.lon).toFixed(4)} • ${place.type||''}</div></div>`; item.onclick=()=>{ const pos={lat:+place.lat, lng:+place.lon}; setDestination(pos); state.destName=short; $('destName').textContent=short; $('alarmDest').textContent='📍 '+short; pushRecent(short, pos); map.flyTo([pos.lat,pos.lng], 15, {duration:1.2}); box.classList.add('hidden'); $('searchInput').value=short; toast('Destination définie : '+short,'success'); expandSheet(); }; box.appendChild(item); }); box.classList.remove('hidden'); }catch(e){ toast('Recherche indisponible (hors-ligne ?)','error'); } finally{ $('searchSpinner').classList.add('hidden'); }}
+$('searchClear').onclick=()=>{ $('searchInput').value=''; $('searchResults').classList.add('hidden'); $('searchClear').classList.add('hidden'); };
+document.addEventListener('click', e=>{ if(!e.target.closest('#searchInput') && !e.target.closest('#searchResults')) $('searchResults').classList.add('hidden'); });
+function setRadius(v){ state.radius = +v; $('radiusSlider').value=v; $('radiusSliderLive').value=v; $('radiusBig').textContent = formatDistance(v); $('radiusExplain').textContent = `${formatDistance(v)} avant l'arrivée`; $('statRadius').textContent = formatShort(v); $('progressTarget').textContent = 'ALERTE À '+formatShort(v).toUpperCase(); document.querySelectorAll('[data-radius]').forEach(b=>b.classList.toggle('active', +b.dataset.radius===+v)); if(radiusCircle) radiusCircle.setRadius(+v); if(state.tracking) refreshDistances();}
+document.querySelectorAll('[data-radius]').forEach(b=>b.onclick=()=>setRadius(b.dataset.radius));
+$('radiusSlider').addEventListener('input', e=>setRadius(e.target.value));
+$('radiusSliderLive').addEventListener('input', e=>setRadius(e.target.value));
+let audioCtx=null, alarmTimer=null, testTimer=null, currentOsc=null;
+function ensureAudio(){ if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } if(audioCtx.state==='suspended') audioCtx.resume(); return audioCtx; }
+function beep(freq=880, dur=0.35, type='sine', vol=0.5, when=0){ const ctx=ensureAudio(); const t=ctx.currentTime+when; const o=ctx.createOscillator(), g=ctx.createGain(); o.type=type; o.frequency.setValueAtTime(freq,t); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+dur+0.05);}
+function startAlarmLoop(kind){ stopAlarmLoop(); ensureAudio(); const patterns={ siren:()=>{ let hi=true; const tick=()=>{ beep(hi?880:620,0.45,'sawtooth',0.28); hi=!hi; }; tick(); alarmTimer=setInterval(tick,500); }, urgent:()=>{ const tick=()=>{ beep(1046,0.14,'square',0.22,0); beep(1046,0.14,'square',0.22,0.2); beep(1046,0.28,'square',0.25,0.4); }; tick(); alarmTimer=setInterval(tick,1100); }, soft:()=>{ const tick=()=>{ beep(523,0.6,'sine',0.35); beep(784,0.6,'sine',0.22,0.35); }; tick(); alarmTimer=setInterval(tick,1400); }, }; (patterns[kind]||patterns.siren)();}
+function stopAlarmLoop(){ if(alarmTimer){ clearInterval(alarmTimer); alarmTimer=null; } }
+document.querySelectorAll('[data-alarm]').forEach(b=>b.onclick=()=>{ state.alarmType=b.dataset.alarm; document.querySelectorAll('[data-alarm]').forEach(x=>x.classList.toggle('active',x===b));});
+$('testSoundBtn').onclick=()=>{ const btn=$('testSoundBtn'); if(testTimer){ clearTimeout(testTimer); testTimer=null; stopAlarmLoop(); $('testEQ').classList.add('hidden'); $('testSoundIcon').textContent='▶'; return; } startAlarmLoop(state.alarmType); $('testEQ').classList.remove('hidden'); $('testSoundIcon').textContent='⏹'; testTimer=setTimeout(()=>{ stopAlarmLoop(); testTimer=null; $('testEQ').classList.add('hidden'); $('testSoundIcon').textContent='▶'; }, 2500);};
+let vibTimer=null;
+function startVibrationLoop(){ stopVibration(); if(!state.vibration || !('vibrate' in navigator)) return; const pattern=[500,200,500,200,800]; try{ navigator.vibrate(pattern); }catch(e){} vibTimer=setInterval(()=>{ try{ navigator.vibrate(pattern); }catch(e){} }, 2200);}
+function stopVibration(){ if(vibTimer){ clearInterval(vibTimer); vibTimer=null; } try{ navigator.vibrate(0); }catch(e){} }
+$('vibToggle').onclick=e=>{ e.stopPropagation(); state.vibration=!state.vibration; $('vibToggle').classList.toggle('on',state.vibration); if(state.vibration && 'vibrate' in navigator){ try{navigator.vibrate(80);}catch(_){}} };
+$('demoToggle').onclick=e=>{ e.stopPropagation(); state.demo=!state.demo; $('demoToggle').classList.toggle('on',state.demo); toast(state.demo?'Mode démo activé — le trajet sera simulé':'Mode démo désactivé','info');};
+function updateStartButton(){ const ok = !!(state.destPos && (state.userPos || state.demo)); $('startBtn').disabled=!ok; $('startHint').textContent = !state.destPos ? 'Définissez une destination pour activer le suivi' : (!state.userPos && !state.demo) ? 'En attente du GPS... ou activez le mode démo' : 'Prêt — le GPS + l\'écran resteront actifs pendant le suivi';}
+async function requestWakeLock(){ try{ if('wakeLock' in navigator){ state.wakeLock = await navigator.wakeLock.request('screen'); $('wakeInfo').classList.remove('hidden'); $('wakeInfo').classList.add('flex'); } }catch(e){}}
+function releaseWakeLock(){ try{ state.wakeLock?.release(); }catch(e){} state.wakeLock=null; $('wakeInfo').classList.add('hidden'); }
+
+function doStartTracking(){
+  ensureAudio();
+  if(state.demo && !state.userPos){
+    const a=Math.random()*Math.PI*2; state.userPos={ lat: state.destPos.lat + Math.cos(a)*0.03, lng: state.destPos.lng + Math.sin(a)*0.03 }; updateUserMarker();
+  }
+  if(!state.userPos){ toast('Position GPS introuvable — activez le GPS ou le mode démo','error'); requestLocation(true); return; }
+  state.tracking=true; state.alarmActive=false; state.alarmMuted=false; state.startTime=Date.now(); state.initialDistance=haversineDistance(state.userPos,state.destPos);
+  pushRecent(state.destName||'Épingle', state.destPos);
+  $('panelSetup').classList.add('hidden'); $('panelTracking').classList.remove('hidden'); $('miniCompass').classList.remove('hidden'); $('sheetHint').textContent='Suivi en cours'; expandSheet(); requestWakeLock();
+  state.elapsedTimer=setInterval(()=>{ const s=Math.floor((Date.now()-state.startTime)/1000); $('elapsedTime').textContent=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; },1000);
+  if(state.demo) startDemoLoop(); else { if('geolocation' in navigator){ state.watchId=navigator.geolocation.watchPosition(p=>onPosition(p,false), err=>{ toast('Signal GPS perdu...','warn'); }, {enableHighAccuracy:true, maximumAge:1000, timeout:15000}); } }
+  fitBoth(); const d=refreshDistances(); toast(`Suivi démarré — alerte à ${formatDistance(state.radius)}`,'success'); try{ beep(880,.15,'sine',.3); beep(1320,.2,'sine',.3,.18); }catch(e){} if(d!=null && d<=state.radius) triggerAlarm();
+}
+
+$('startBtn').onclick=()=>{
+  if(!state.destPos){ toast('Choisissez d\'abord une destination','warn'); return; }
+  // Unity Interstitial Android : afficher avant le suivi si prêt
+  if(unityState.enabled && unityState.ready && canShowInterstitial()){
+    showUnityInterstitial(()=>{ doStartTracking(); });
+  } else {
+    if(unityState.enabled && !unityState.ready && unityState.initialized){
+      toast('Chargement de la publicité... démarrage direct','info');
+    }
+    doStartTracking();
+  }
+};
+
+function startDemoLoop(){ stopDemoLoop(); toast('🧪 Démo : simulation du déplacement...','info'); state.demoTimer=setInterval(()=>{ if(!state.tracking || !state.userPos || !state.destPos) return; const d=haversineDistance(state.userPos,state.destPos); const step=Math.max(18, d*0.05); state.userPos=moveTowards(state.userPos,state.destPos,step); state.accuracy=8; state.speed=step; updateUserMarker(); refreshDistances(); },1000);}
+function stopDemoLoop(){ if(state.demoTimer){ clearInterval(state.demoTimer); state.demoTimer=null; } }
+function updateTrackingUI(dist){ $('liveDistance').textContent=formatDistance(dist); const inside = dist<=state.radius; $('insideBadge').classList.toggle('hidden', !inside); const speedKmh = state.speed? state.speed*3.6 : 0; $('statSpeed').textContent = speedKmh>=0.5? Math.round(speedKmh):'0'; let eta='—'; if(speedKmh>2){ const sec=dist/(speedKmh/3.6); eta = sec<60? `${Math.round(sec)}s` : `~${Math.round(sec/60)}min`; } $('statEta').textContent=eta; if(state.userPos&&state.destPos){ const b=calculateBearing(state.userPos,state.destPos); $('statCap').textContent=compassLabel(b); $('panelArrow').style.transform=`rotate(${b}deg)`; $('compassArrow').style.transform=`rotate(${b}deg)`; $('headingText').textContent=`Direction : ${compassLabel(b)} (${Math.round(b)}°) — ${state.destName||'destination'}`; } $('compassDist').textContent=formatShort(dist); $('liveSub').textContent = inside ? `🎯 Dans la zone — ${formatDistance(dist)} avant l'arrivée` : (eta!=='—'? `À vol d'oiseau • Arrivée dans ${eta} au rythme actuel` : `${formatDistance(Math.max(0,dist-state.radius))} avant le déclenchement • ${formatDistance(dist)} au total`); let pct=0; if(state.initialDistance && state.initialDistance>state.radius) pct=Math.min(100,Math.max(0,(1-(dist-state.radius)/(state.initialDistance-state.radius))*100)); else pct = inside?100:Math.min(99,Math.max(0,(1-dist/Math.max(dist,1))*100)); const bar=$('trackingProgress'); bar.style.width=pct+'%'; bar.style.background = inside? 'linear-gradient(90deg,#ff2d55,#ff8a5c)' : pct>70? 'linear-gradient(90deg,#a3e635,#22d3ee)' : 'linear-gradient(90deg,#6366f1,#22d3ee)'; $('progressPct').textContent=Math.round(pct)+'%'; if(state.alarmActive){ $('alarmDistance').textContent=formatDistance(dist); } if(inside && !state.alarmActive && !state.alarmMuted) triggerAlarm();}
+$('stopBtn').onclick=()=>stopAll('Suivi arrêté');
+$('muteBtn').onclick=()=>{ stopAlarmLoop(); stopVibration(); $('muteBtn').textContent = $('muteBtn').textContent.includes('Couper')? '🔔 Réactiver son' : '🔕 Couper son'; toast('Son coupé — le suivi visuel continue','info');};
+function stopAll(msg){ state.tracking=false; state.alarmActive=false; state.alarmMuted=false; if(state.watchId!=null){ try{navigator.geolocation.clearWatch(state.watchId);}catch(e){} state.watchId=null; } stopDemoLoop(); stopAlarmLoop(); stopVibration(); releaseWakeLock(); if(state.elapsedTimer){ clearInterval(state.elapsedTimer); state.elapsedTimer=null; } $('alarmOverlay').classList.remove('active'); $('panelTracking').classList.add('hidden'); $('panelSetup').classList.remove('hidden'); $('miniCompass').classList.add('hidden'); $('muteBtn').textContent='🔕 Couper son'; updateStartButton(); if(msg) toast(msg,'info');}
+function triggerAlarm(){ if(state.alarmActive) return; state.alarmActive=true; const d=haversineDistance(state.userPos,state.destPos); $('alarmDistance').textContent=formatDistance(d); $('alarmOverlay').classList.add('active'); startAlarmLoop(state.alarmType); startVibrationLoop(); if(document.hidden===false){ try{beep(1567,.4,'sine',.4);}catch(e){} }}
+$('alarmStopAll').onclick=()=>stopAll('Alarme et suivi arrêtés — bon trajet ! 👋');
+$('alarmContinue').onclick=()=>{ stopAlarmLoop(); stopVibration(); state.alarmActive=false; state.alarmMuted=true; $('alarmOverlay').classList.remove('active'); toast('Son coupé — suivi visuel maintenu. Restez attentif !','warn'); setTimeout(()=>{ if(state.tracking) state.alarmMuted=false; }, 120000);};
+$('locateBtn').onclick=()=>{ if(state.userPos) map.flyTo([state.userPos.lat,state.userPos.lng],16,{duration:1}); else requestLocation(true); };
+$('fitBtn').onclick=()=>fitBoth();
+function fitBoth(){ if(state.userPos&&state.destPos) map.flyToBounds(L.latLngBounds([[state.userPos.lat,state.userPos.lng],[state.destPos.lat,state.destPos.lng]].map(p=>p), {padding:[70,70]}), {duration:1}); else if(state.destPos) map.flyTo([state.destPos.lat,state.destPos.lng],15,{duration:1}); }
+$('zoomIn').onclick=()=>map.zoomIn(); $('zoomOut').onclick=()=>map.zoomOut();
+$('clearDestBtn').onclick=()=>{ if(state.tracking){ toast('Impossible pendant le suivi — arrêtez d\'abord','warn'); return; } clearDestination(); };
+$('centerDestBtn').onclick=()=>{ if(state.destPos) map.flyTo([state.destPos.lat,state.destPos.lng],16,{duration:1}); };
+$('changeDestBtn').onclick=()=>{ collapseSheet(); toast('Touchez la carte pour déplacer l\'épingle','info'); };
+$('demoDestBtn').onclick=()=>{ const pos={lat:48.8443,lng:2.3735}; setDestination(pos); state.destName='Gare de Lyon, Paris'; $('destName').textContent=state.destName; $('alarmDest').textContent='📍 Gare de Lyon, Paris'; pushRecent(state.destName,pos); map.flyTo([pos.lat,pos.lng],14,{duration:1.2}); if(!state.userPos && state.demo){ state.userPos={lat:48.8800,lng:2.3500}; updateUserMarker(); refreshDistances(); updateStartButton(); }};
+$('themeBtn').onclick=()=>{ isDarkMap=!isDarkMap; if(isDarkMap){ map.removeLayer(lightTiles); darkTiles.addTo(map); document.documentElement.dataset.theme='dark'; } else{ map.removeLayer(darkTiles); lightTiles.addTo(map); document.documentElement.dataset.theme='light'; } $('themeIconMoon').classList.toggle('hidden',!isDarkMap); $('themeIconSun').classList.toggle('hidden',isDarkMap); toast(isDarkMap?'Thème sombre':'Thème clair','info');};
+const sheet=$('bottomSheet');
+function collapseSheet(){ if(window.innerWidth<768) sheet.classList.add('collapsed'); }
+function expandSheet(){ sheet.classList.remove('collapsed'); }
+$('sheetHandle').onclick=()=>{ if(window.innerWidth<768) sheet.classList.toggle('collapsed'); };
+let touchY=null;
+$('sheetHandle').addEventListener('touchstart',e=>touchY=e.touches[0].clientY,{passive:true});
+$('sheetHandle').addEventListener('touchend',e=>{ if(touchY==null) return; const dy=e.changedTouches[0].clientY-touchY; if(dy>40) collapseSheet(); else if(dy<-40) expandSheet(); touchY=null;},{passive:true});
+let slideIdx=0;
+function showSlide(i){ slideIdx=i; document.querySelectorAll('.slide').forEach(s=>s.classList.toggle('active',+s.dataset.slide===i)); document.querySelectorAll('#onboardDots .dot').forEach((d,k)=>{ d.style.width=k===i?'24px':'8px'; d.style.background=k===i?'#fff':'rgba(255,255,255,.25)'; }); $('onboardNext').textContent = i===2? 'Commencer 🚀' : 'Suivant →';}
+$('onboardNext').onclick=()=>{ if(slideIdx<2) showSlide(slideIdx+1); else closeOnboarding(); };
+$('onboardSkip').onclick=closeOnboarding;
+function closeOnboarding(){ $('onboarding').classList.add('hidden2'); $('onboarding').style.display='none'; }
+$('gpsEnableBtn').onclick=()=>{ requestLocation(true); closeOnboarding(); expandSheet(); };
+const FILES={install:`# 🚀 ARRIVA — Installation Vite + React + Tailwind + Leaflet + Unity Ads
+\`\`\`bash
+# 1. Créer le projet
+npm create vite@latest arriva-app -- --template react
+cd arriva-app
+# 2. Dépendances carte
+npm install leaflet react-leaflet
+# 3. Tailwind CSS
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+\`\`\`
+# 4. tailwind.config.js → content: ["./index.html","./src/**/*.{js,jsx}"]
+# 5. src/index.css →
+# @tailwind base; @tailwind components; @tailwind utilities;
+# @import 'leaflet/dist/leaflet.css';
+# 6. Copiez les fichiers ci-contre :
+# src/utils/geo.js
+# src/utils/unityAds.js  ← Unity Ads BP_Interstitial_Android
+# src/components/MapComponent.jsx
+# src/components/AlertControl.jsx
+# src/App.jsx
+# 7. Lancer
+npm run dev
+# → ouvrez sur mobile via l'URL réseau (https requis pour le GPS).`,geo:`// src/utils/geo.js
+// ─────────────────────────────────────────────
+// Utilitaires GPS : Haversine, cap, formatage.
+// Pur JS, testable, sans dépendance.
+// ─────────────────────────────────────────────
 const toRad = (deg) => (deg * Math.PI) / 180;
-
-/**
- * Calcule la distance (en mètres) entre deux points GPS
- * en utilisant la formule de Haversine.
- * @param {{lat:number, lng:number}} a
- * @param {{lat:number, lng:number}} b
- * @returns {number} distance en mètres
- */
-function haversineDistance(a, b) {
-  const R = 6371000; // rayon de la Terre en mètres
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-
-  const h = Math.sin(dLat / 2) ** 2 +
-            Math.cos(lat1) * Math.cos(lat2) *
-            Math.sin(dLng / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-  return R * c;
+const EARTH_RADIUS_M = 6371000;
+/** Distance en mètres entre deux points {lat,lng} (Haversine). */
+export function haversineDistance(from, to) {
+  if (!from || !to) return null;
+  const dLat = toRad(to.lat - from.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a));
 }
-
-/** Formate une distance (mètres ou km lisibles) */
-function formatDistance(meters) {
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(2)} km`;
+/** Cap en degrés (0=N, 90=E...) de from vers to. */
+export function calculateBearing(from, to) {
+  const dLng = toRad(to.lng - from.lng);
+  const y = Math.sin(dLng) * Math.cos(toRad(to.lat));
+  const x = Math.cos(toRad(from.lat)) * Math.sin(toRad(to.lat)) - Math.sin(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
-
-/* ============================================================
-   Audio — Alerte sonore (Web Audio API Oscillator)
-   ============================================================ */
-function useAlarmSound() {
-  const ctxRef = useRef(null);
-  const intervalRef = useRef(null);
-  const playingRef = useRef(false);
-
-  const play = useCallback(() => {
-    if (playingRef.current) return;
-    playingRef.current = true;
-    if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-
-    const beep = (time, freq) => {
-      const ctx = ctxRef.current;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, time);
-      gain.gain.exponentialRampToValueAtTime(0.4, time + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(time);
-      osc.stop(time + 0.35);
-    };
-
-    const loop = () => {
-      const ctx = ctxRef.current;
-      const now = ctx.currentTime;
-      beep(now, 880);
-      beep(now + 0.4, 1100);
-    };
-    loop();
-    intervalRef.current = setInterval(loop, 900);
-  }, []);
-
-  const stop = useCallback(() => {
-    playingRef.current = false;
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    if (ctxRef.current && ctxRef.current.state === 'running') {
-      ctxRef.current.close().then(() => { ctxRef.current = null; });
-    }
-  }, []);
-
-  return { play, stop };
-}
-
-/* ============================================================
-   useGeolocation — Wrapper autour de navigator.geolocation
-   ============================================================ */
-function useGeolocation() {
-  const [position, setPosition] = useState(null);
-  const [error, setError] = useState(null);
-  const watchIdRef = useRef(null);
-
-  const getOnce = useCallback(() => new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error("Géolocalisation non supportée"));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        setPosition(p);
-        resolve(p);
-      },
-      (err) => { setError(err.message); reject(err); },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-    );
-  }), []);
-
-  const watch = useCallback((onUpdate) => {
-    if (!navigator.geolocation) return null;
-    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        setPosition(p);
-        onUpdate && onUpdate(p);
-      },
-      (err) => setError(err.message),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
-    );
-    return watchIdRef.current;
-  }, []);
-
-  const stopWatch = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-  }, []);
-
-  return { position, error, getOnce, watch, stopWatch, setPosition };
-}
-
-/* ============================================================
-   MapComponent.jsx — Carte Leaflet interactive
-   ============================================================ */
-function MapComponent({ userPos, destination, radius, onMapClick, followUser, mapRef }) {
-  const containerRef = useRef(null);
-  const leafletMap = useRef(null);
-  const userMarkerRef = useRef(null);
-  const destMarkerRef = useRef(null);
-  const circleRef = useRef(null);
-  const userLayerRef = useRef(null);
-  const destLayerRef = useRef(null);
-  const [ready, setReady] = useState(false);
-
-  // Init map
-  useEffect(() => {
-    if (leafletMap.current || !containerRef.current) return;
-    const map = L.map(containerRef.current, {
-      zoomControl: true,
-      attributionControl: true,
-      zoomSnap: 0.25,
-    }).setView([46.6, 2.4], 5);
-
-    // Dark tile layer (CartoDB Dark Matter - gratuit, sans clé API)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 20,
-    }).addTo(map);
-
-    map.on('click', (e) => {
-      onMapClick && onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
-    });
-
-    leafletMap.current = map;
-    mapRef.current = map;
-    setReady(true);
-
-    // Fix taille après montage
-    setTimeout(() => map.invalidateSize(), 200);
-
-    return () => { map.remove(); leafletMap.current = null; };
-  }, []);
-
-  // Expose invalidateSize on resize
-  useEffect(() => {
-    const onResize = () => leafletMap.current && leafletMap.current.invalidateSize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  // User marker
-  useEffect(() => {
-    if (!leafletMap.current || !userPos) return;
-    const map = leafletMap.current;
-    const icon = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [18,18], iconAnchor: [9,9] });
-
-    if (!userMarkerRef.current) {
-      userMarkerRef.current = L.marker([userPos.lat, userPos.lng], { icon, zIndexOffset: 1000 }).addTo(map);
-    } else {
-      userMarkerRef.current.setLatLng([userPos.lat, userPos.lng]);
-    }
-    if (followUser) {
-      map.setView([userPos.lat, userPos.lng], Math.max(map.getZoom(), 16), { animate: true });
-    }
-  }, [userPos, followUser]);
-
-  // Destination marker + radius circle
-  useEffect(() => {
-    if (!leafletMap.current) return;
-    const map = leafletMap.current;
-
-    if (destination) {
-      const icon = L.divIcon({ className: '', html: '<div class="destination-pin"></div>', iconSize: [28,28], iconAnchor: [14,28] });
-      if (!destMarkerRef.current) {
-        destMarkerRef.current = L.marker([destination.lat, destination.lng], { icon }).addTo(map);
-      } else {
-        destMarkerRef.current.setLatLng([destination.lat, destination.lng]);
-      }
-      map.setView([destination.lat, destination.lng], Math.max(map.getZoom(), 14), { animate: true });
-
-      // Circle radius
-      if (circleRef.current) map.removeLayer(circleRef.current);
-      circleRef.current = L.circle([destination.lat, destination.lng], {
-        radius: radius,
-        color: '#ef4444',
-        fillColor: '#ef4444',
-        fillOpacity: 0.12,
-        weight: 2,
-        dashArray: '6 6',
-      }).addTo(map);
-    } else {
-      if (destMarkerRef.current) { map.removeLayer(destMarkerRef.current); destMarkerRef.current = null; }
-      if (circleRef.current) { map.removeLayer(circleRef.current); circleRef.current = null; }
-    }
-  }, [destination]);
-
-  // Update circle radius live
-  useEffect(() => {
-    if (circleRef.current && destination) circleRef.current.setRadius(radius);
-  }, [radius, destination]);
-
-  return <div ref={containerRef} className="absolute inset-0 z-0" />;
-}
-
-/* ============================================================
-   SearchBar — Recherche d'adresse via Nominatim (gratuit)
-   ============================================================ */
-function SearchBar({ onSelect }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const timerRef = useRef(null);
-
-  const search = useCallback(async (q) => {
-    if (q.trim().length < 3) { setResults([]); return; }
-    setLoading(true);
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`, {
-        headers: { 'Accept-Language': 'fr' }
-      });
-      const data = await res.json();
-      setResults(data);
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  }, []);
-
-  const onChange = (val) => {
-    setQuery(val);
-    setOpen(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => search(val), 400);
-  };
-
-  const choose = (r) => {
-    const pos = { lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
-    setQuery(r.display_name.split(',').slice(0,2).join(','));
-    setOpen(false);
-    onSelect(pos);
-  };
-
+/** 850 → "850 m" | 1340 → "1.34 km" */
+export function formatDistance(meters) {
+  if (meters == null) return "—";
+  if (meters < 1000) return \`\${Math.round(meters)} m\`;
+  return \`\${(meters / 1000).toFixed(2)} km\`;
+}`,map:`// src/components/MapComponent.jsx
+import { MapContainer, TileLayer, Marker, Circle, Polyline, useMapEvents, useMap,} from "react-leaflet";
+import L from "leaflet";
+import { useEffect } from "react";
+// Fix icônes Leaflet avec Vite
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+const destIcon = new L.Icon({ iconUrl, shadowUrl, iconSize:[25,41] });
+// Centre auto sur la position utilisateur
+function Recenter({ position }) { const map = useMap(); useEffect(() => { if (position) map.flyTo([position.lat, position.lng], 15); }, [position, map]); return null;}
+// Clic carte → pose la destination
+function ClickHandler({ onSelect }) { useMapEvents({ click: (e) => onSelect({ lat: e.latlng.lat, lng: e.latlng.lng }) }); return null;}
+export default function MapComponent({ userPos, destPos, radius, onSelectDest,}) {
   return (
-    <div className="relative">
-      <div className="glass rounded-2xl flex items-center gap-2 px-3 py-2.5 shadow-2xl">
-        <svg className="w-5 h-5 text-sky-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
-        </svg>
-        <input
-          value={query}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setOpen(true)}
-          placeholder="Rechercher une adresse, un lieu…"
-          className="bg-transparent outline-none text-sm text-slate-100 placeholder-slate-400 flex-1 min-w-0"
-        />
-        {loading && <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0" />}
-        {query && !loading && (
-          <button onClick={() => { setQuery(''); setResults([]); }} className="text-slate-400 hover:text-slate-200 shrink-0">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          </button>
-        )}
+    <MapContainer center={userPos ? [userPos.lat, userPos.lng] : [48.8566, 2.3522]} zoom={13} className="h-full w-full z-0">
+      <TileLayer attribution='© OpenStreetMap © CARTO' url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+      <ClickHandler onSelect={onSelectDest} />
+      <Recenter position={userPos} />
+      {userPos && (<Marker position={[userPos.lat, userPos.lng]} />)}
+      {destPos && (<><Marker position={[destPos.lat, destPos.lng]} icon={destIcon} draggable /><Circle center={[destPos.lat, destPos.lng]} radius={radius} pathOptions={{ color:"#ff2d55", dashArray:"8 6" }} /></>)}
+      {userPos && destPos && (<Polyline positions={[[userPos.lat, userPos.lng],[destPos.lat, destPos.lng],]} pathOptions={{ color:"#22d3ee", dashArray:"8 10" }} />)}
+    </MapContainer>
+  );
+}`,alert:`// src/components/AlertControl.jsx
+// Panneau : rayon, démarrage, HUD temps réel, bannière alerte.
+import { formatDistance } from "../utils/geo";
+const PRESETS = [200, 500, 1000, 2000];
+export default function AlertControl({ radius, setRadius, tracking, distance, alarm, onStart, onStop, hasDestination,}) {
+  return (
+    <div className="absolute bottom-0 inset-x-0 md:left-5 md:bottom-5 md:w-[380px] z-[1000]">
+      <div className="bg-slate-900/85 backdrop-blur-xl border border-white/10 rounded-t-3xl md:rounded-3xl p-5">
+        {/* Bannière alerte plein cadre */}
+        {alarm && (<div className="mb-4 rounded-2xl bg-red-600 p-4 text-center animate-pulse"><p className="text-white font-black text-xl">🚨 Vous arrivez à destination !</p><p className="text-white/90 font-bold">{formatDistance(distance)} restants</p></div>)}
+        {!tracking ? (<><h2 className="font-bold text-white mb-2">Rayon d'alerte : {formatDistance(radius)}</h2><div className="grid grid-cols-4 gap-2 mb-3">{PRESETS.map((p) => (<button key={p} onClick={() => setRadius(p)} className={\`rounded-xl py-2 text-sm font-bold \${p===radius ? "bg-indigo-500 text-white" : "bg-white/10 text-slate-300"}\`}>{p >= 1000 ? p/1000+"km" : p+"m"}</button>))}</div><input type="range" min={100} max={5000} step={50} value={radius} onChange={(e)=>setRadius(+e.target.value)} className="w-full accent-indigo-500" /><button onClick={onStart} disabled={!hasDestination} className="mt-4 w-full rounded-2xl py-4 font-bold text-white bg-gradient-to-r from-indigo-500 to-fuchsia-500 disabled:opacity-40">▶ Démarrer le suivi du trajet</button></>) : (<><p className="text-slate-400 text-xs font-bold tracking-widest">DISTANCE RESTANTE</p><p className="text-white text-5xl font-black">{formatDistance(distance)}</p><button onClick={onStop} className="mt-4 w-full rounded-2xl py-4 font-bold text-white bg-red-600">■ Arrêter l'alarme et le suivi</button></>)}
       </div>
-      {open && results.length > 0 && (
-        <div className="glass mt-2 rounded-2xl overflow-hidden shadow-2xl max-h-72 overflow-y-auto no-scrollbar z-50">
-          {results.map((r) => (
-            <button
-              key={r.place_id}
-              onClick={() => choose(r)}
-              className="w-full text-left px-4 py-3 hover:bg-slate-700/50 transition border-b border-slate-700/40 last:border-0"
-            >
-              <div className="text-sm text-slate-100 line-clamp-2">{r.display_name}</div>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
+}`,app:`// src/App.jsx — composant principal (état en mémoire, useState)
+import { useEffect, useRef, useState, useCallback } from "react";
+import MapComponent from "./components/MapComponent";
+import AlertControl from "./components/AlertControl";
+import { haversineDistance } from "./utils/geo";
+import { useUnityInterstitial } from "./utils/unityAds";
+// ── Alarme Web Audio API : sirène deux tons ──
+function useAlarmSound() {
+  const ctxRef = useRef(null); const timerRef = useRef(null);
+  const beep = (freq, dur=0.4) => { const ctx = ctxRef.current; const t = ctx.currentTime; const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.type = "sawtooth"; osc.frequency.value = freq; gain.gain.setValueAtTime(0.25, t); gain.gain.exponentialRampToValueAtTime(0.001, t + dur); osc.connect(gain).connect(ctx.destination); osc.start(t); osc.stop(t + dur); };
+  const start = useCallback(() => { if (!ctxRef.current) ctxRef.current = new (window.AudioContext)(); ctxRef.current.resume(); let high = true; beep(880); timerRef.current = setInterval(() => { beep(high ? 620 : 880); high = !high; }, 500); }, []);
+  const stop = useCallback(() => { clearInterval(timerRef.current); timerRef.current = null; }, []);
+  return { start, stop };
 }
-
-/* ============================================================
-   App.jsx — Composant principal
-   ============================================================ */
-function App() {
-  const mapRef = useRef(null);
-  const { position, error, getOnce, watch, stopWatch, setPosition } = useGeolocation();
-  const { play: playAlarm, stop: stopAlarm } = useAlarmSound();
-
-  const [destination, setDestination] = useState(null);
+export default function App() {
+  const [userPos, setUserPos] = useState(null); // {lat,lng}
+  const [destPos, setDestPos] = useState(null);
   const [radius, setRadius] = useState(500); // mètres
   const [tracking, setTracking] = useState(false);
-  const [alertActive, setAlertActive] = useState(false);
   const [distance, setDistance] = useState(null);
-  const [followUser, setFollowUser] = useState(true);
-  const [permissionAsked, setPermissionAsked] = useState(false);
-
-  // Demande la position au démarrage
-  useEffect(() => {
-    getOnce().catch(() => {});
-    setPermissionAsked(true);
-  }, []);
-
-  // Suivi actif
-  const startTracking = useCallback(() => {
-    if (!destination) {
-      alert("Veuillez d'abord sélectionner une destination sur la carte ou via la recherche.");
-      return;
-    }
-    setAlertActive(false);
-    setTracking(true);
-    setFollowUser(true);
-    playAlarm(); // débloque l'audio context sur interaction utilisateur
-    stopAlarm();
-
-    watch((p) => {
-      if (!destination) return;
-      const d = haversineDistance(p, destination);
-      setDistance(d);
-      if (d <= radius && !alertActive) {
-        triggerAlert();
-      } else if (d > radius && alertActive) {
-        // sortir de la zone désactive automatiquement l'alarme visuelle/sonore
-        stopAlarm();
-        setAlertActive(false);
-      }
-    });
-  }, [destination, radius, alertActive, watch]);
-
-  const triggerAlert = useCallback(() => {
-    setAlertActive(true);
-    playAlarm();
-    if (navigator.vibrate) {
-      try { navigator.vibrate([500, 200, 500, 200, 500, 200, 500]); } catch(e) {}
-    }
-  }, [playAlarm]);
-
-  const stopTracking = useCallback(() => {
-    setTracking(false);
-    setAlertActive(false);
-    stopAlarm();
-    stopWatch();
-  }, [stopAlarm, stopWatch]);
-
-  // Recalcul de la distance si la destination ou la position change hors tracking
-  useEffect(() => {
-    if (destination && position && !tracking) {
-      setDistance(haversineDistance(position, destination));
-    }
-  }, [destination, position, tracking]);
-
-  const handleMapClick = useCallback((coords) => {
-    setDestination(coords);
-  }, []);
-
-  const recenter = useCallback(() => {
-    if (position && mapRef.current) {
-      mapRef.current.setView([position.lat, position.lng], 16, { animate: true });
-      setFollowUser(true);
-    }
-  }, [position]);
-
-  const clearDestination = () => {
-    setDestination(null);
-    setDistance(null);
-    if (tracking) stopTracking();
+  const [alarm, setAlarm] = useState(false);
+  const watchId = useRef(null);
+  const alarmSound = useAlarmSound();
+  const { isReady, show } = useUnityInterstitial("BP_Interstitial_Android");
+  // 1️⃣ Position initiale au chargement
+  useEffect(() => { navigator.geolocation?.getCurrentPosition((p) => setUserPos({ lat: p.coords.latitude, lng: p.coords.longitude }), console.warn, { enableHighAccuracy: true }); }, []);
+  // 2️⃣ Recalcul Haversine à chaque mouvement
+  useEffect(() => { if (userPos && destPos) setDistance(haversineDistance(userPos, destPos)); }, [userPos, destPos]);
+  // 3️⃣ Déclenchement de l'alerte
+  useEffect(() => { if (tracking && distance != null && distance <= radius) { setAlarm(true); alarmSound.start(); navigator.vibrate?.([500, 200, 500, 200]); } }, [distance, radius, tracking, alarmSound]);
+  const startTracking = () => {
+    if (!destPos) return;
+    const launch = () => {
+      setTracking(true); setAlarm(false);
+      watchId.current = navigator.geolocation.watchPosition((p) => setUserPos({ lat: p.coords.latitude, lng: p.coords.longitude }), console.warn, { enableHighAccuracy: true, maximumAge: 1000 });
+    };
+    if(isReady) show(launch); else launch();
   };
+  const stopAll = () => { setTracking(false); setAlarm(false); alarmSound.stop(); navigator.vibrate?.(0); if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current); };
+  return (<div className="h-screen w-screen relative overflow-hidden bg-slate-950"><MapComponent userPos={userPos} destPos={destPos} radius={radius} onSelectDest={setDestPos} /><AlertControl radius={radius} setRadius={setRadius} tracking={tracking} distance={distance} alarm={alarm} hasDestination={!!destPos} onStart={startTracking} onStop={stopAll} /></div>);
+}`,unity:`// src/utils/unityAds.js
+// ─────────────────────────────────────────────
+// Unity Ads — BP_Interstitial_Android (Android)
+// Wrapper React pour Unity Ads Interstitial
+// Docs: https://docs.unity.com/ads
+// ─────────────────────────────────────────────
+import { useEffect, useState, useCallback, useRef } from "react";
 
-  // Progress d'approche (pour la barre visuelle)
-  const progress = useMemo(() => {
-    if (!distance || !radius) return 0;
-    // 0 quand loin (> 3x radius), 100 quand arrivé
-    const max = radius * 3;
-    const v = Math.min(100, Math.max(0, (1 - (distance - radius) / (max - radius)) * 100));
-    return distance <= radius ? 100 : v;
-  }, [distance, radius]);
+// Config Android — remplacez par vos vrais IDs Unity Dashboard
+const UNITY_CONFIG = {
+  gameId: "5432107", // Android Game ID (exemple)
+  placementId: "BP_Interstitial_Android",
+  testMode: true, // false en production
+};
 
-  return (
-    <div className="relative w-full h-full overflow-hidden bg-slate-950 text-slate-100 select-none">
-      {/* Carte */}
-      <MapComponent
-        userPos={position}
-        destination={destination}
-        radius={radius}
-        onMapClick={handleMapClick}
-        followUser={followUser && tracking}
-        mapRef={mapRef}
-      />
+/**
+ * Hook : gère init + load + show de l'interstitiel Android
+ * - Initialise UnityAds une seule fois
+ * - Précharge BP_Interstitial_Android
+ * - Frequency capping 1 affichage / 2 min
+ * - Callback afterAd pour enchaîner le suivi GPS
+ */
+export function useUnityInterstitial(placementId = UNITY_CONFIG.placementId) {
+  const [isReady, setIsReady] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const lastShownRef = useRef(0);
 
-      {/* Overlay top : Search + status */}
-      <div className="absolute top-0 left-0 right-0 z-[500] px-3 pt-3 pb-2 pointer-events-none">
-        <div className="max-w-md mx-auto pointer-events-auto">
-          <div className="flex items-center justify-between mb-2">
-            <div className="glass rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg">
-              <div className={"w-2 h-2 rounded-full " + (position ? "bg-emerald-400" : "bg-amber-400 animate-pulse")}></div>
-              <span className="text-xs font-medium text-slate-200">
-                {position ? "GPS actif" : "Localisation…"}
-              </span>
-            </div>
-            <div className="glass rounded-full px-3 py-1.5 text-xs font-medium text-slate-200 shadow-lg">
-              ArrivAlert
-            </div>
-          </div>
-          <SearchBar onSelect={setDestination} />
-        </div>
-      </div>
+  // 1️⃣ Initialisation SDK (une fois)
+  useEffect(() => {
+    if (window.UnityAds) {
+      window.UnityAds.initialize(UNITY_CONFIG.gameId, UNITY_CONFIG.testMode, {
+        onComplete: () => setIsInitialized(true),
+        onFailed: (e) => console.error("Unity init failed", e),
+      });
+    } else {
+      // Mock pour dev web (sans SDK natif)
+      console.log("[UnityAds Mock] initialize", UNITY_CONFIG.gameId);
+      setTimeout(() => setIsInitialized(true), 800);
+    }
+  }, []);
 
-      {/* Bouton recentrer */}
-      {position && (
-        <button
-          onClick={recenter}
-          className="absolute right-3 z-[500] glass rounded-full w-11 h-11 flex items-center justify-center shadow-2xl btn-press"
-          style={{ bottom: 'calc(50% - 24px)' }}
-          aria-label="Recentrer"
-        >
-          <svg className="w-5 h-5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="3"/>
-            <circle cx="12" cy="12" r="9"/>
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-          </svg>
-        </button>
-      )}
+  // 2️⃣ Load placement
+  const load = useCallback(() => {
+    if (!isInitialized) return;
+    setIsReady(false);
+    if (window.UnityAds?.load) {
+      window.UnityAds.load(placementId, {
+        onLoaded: () => setIsReady(true),
+        onFailed: () => setIsReady(false),
+      });
+    } else {
+      setTimeout(() => setIsReady(true), 1000); // mock
+    }
+  }, [isInitialized, placementId]);
 
-      {/* Bottom panel */}
-      <div className="absolute bottom-0 left-0 right-0 z-[500] px-3 pb-4">
-        <div className="max-w-md mx-auto glass rounded-3xl p-4 shadow-2xl sheet-enter">
-          {/* Destination summary */}
-          {destination ? (
-            <div className="flex items-start gap-3 mb-3">
-              <div className="mt-0.5">
-                <div className="destination-pin" style={{ transform: 'scale(.7)' }}></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] uppercase tracking-wider text-rose-400 font-semibold">Destination</div>
-                <div className="text-sm text-slate-100 font-mono truncate">
-                  {destination.lat.toFixed(5)}, {destination.lng.toFixed(5)}
-                </div>
-              </div>
-              <button onClick={clearDestination} className="text-slate-400 hover:text-rose-400 transition btn-press">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 mb-3 text-slate-300">
-              <svg className="w-5 h-5 text-sky-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11a8 8 0 1 1 16 0c0 6.5-8 11-8 11Z"/><circle cx="12" cy="11" r="3"/></svg>
-              <div className="text-sm">
-                Touchez la carte ou recherchez un lieu pour définir votre destination.
-              </div>
-            </div>
-          )}
+  useEffect(() => { if (isInitialized) load(); }, [isInitialized, load]);
 
-          {/* Distance live */}
-          {destination && distance !== null && (
-            <div className="mb-3 rounded-2xl bg-slate-800/60 p-3 border border-slate-700/50">
-              <div className="flex items-baseline justify-between">
-                <span className="text-xs text-slate-400">Distance restante</span>
-                <span className={"text-2xl font-bold tabular-nums " + (alertActive ? "text-rose-400" : "text-sky-300")}>
-                  {formatDistance(distance)}
-                </span>
-              </div>
-              {/* Barre de progression d'approche */}
-              <div className="mt-2 h-2 rounded-full bg-slate-700/60 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${progress}%`,
-                    background: alertActive
-                      ? 'linear-gradient(90deg,#ef4444,#f97316)'
-                      : 'linear-gradient(90deg,#38bdf8,#6366f1)'
-                  }}
-                />
-              </div>
-              <div className="mt-1.5 flex justify-between text-[10px] text-slate-500">
-                <span>Réveil à {formatDistance(radius)}</span>
-                <span>{progress >= 100 ? 'Arrivé !' : `${Math.round(progress)}%`}</span>
-              </div>
-            </div>
-          )}
+  // 3️⃣ Show avec capping
+  const show = useCallback((afterAd) => {
+    const now = Date.now();
+    if (now - lastShownRef.current < 120_000) {
+      afterAd?.(); return; // trop tôt
+    }
+    if (!isReady) { afterAd?.(); return; }
 
-          {/* Rayon d'alerte */}
-          <div className="mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs text-slate-400 font-medium">Rayon d'alerte</label>
-              <span className="text-xs font-bold text-sky-300 tabular-nums">{formatDistance(radius)}</span>
-            </div>
-            <input
-              type="range" min="100" max="2000" step="50"
-              value={radius}
-              onChange={(e) => setRadius(parseInt(e.target.value))}
-              disabled={tracking}
-              className="w-full"
-            />
-            <div className="mt-2 flex gap-2">
-              {[200, 500, 1000].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRadius(r)}
-                  disabled={tracking}
-                  className={"flex-1 text-xs py-1.5 rounded-xl border transition btn-press " +
-                    (radius === r
-                      ? "bg-sky-500/20 border-sky-400 text-sky-300"
-                      : "border-slate-700 text-slate-400 hover:border-slate-500")}
-                >
-                  {r < 1000 ? `${r}m` : `${r/1000}km`}
-                </button>
-              ))}
-            </div>
-          </div>
+    const onDone = () => {
+      lastShownRef.current = Date.now();
+      setIsReady(false);
+      load(); // précharge le suivant
+      afterAd?.();
+    };
 
-          {/* Boutons d'action */}
-          {!tracking ? (
-            <button
-              onClick={startTracking}
-              disabled={!destination}
-              className="w-full py-3.5 rounded-2xl font-semibold text-white shadow-lg btn-press transition disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg,#38bdf8,#6366f1)' }}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m5 3 14 9-14 9V3Z"/></svg>
-                Démarrer le suivi du trajet
-              </span>
-            </button>
-          ) : (
-            <button
-              onClick={stopTracking}
-              className="w-full py-3.5 rounded-2xl font-semibold text-white shadow-lg btn-press alert-flash"
-            >
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                Arrêter l'alarme et le suivi
-              </span>
-            </button>
-          )}
+    if (window.UnityAds?.show) {
+      window.UnityAds.show(placementId, {
+        onStart: () => console.log("Unity Ad started"),
+        onComplete: onDone,
+        onSkipped: onDone,
+        onFailed: onDone,
+      });
+    } else {
+      // Fallback web : overlay personnalisé (voir <UnityInterstitialOverlay />)
+      window.dispatchEvent(new CustomEvent("unity:show-interstitial", { detail: { placementId, onDone } }));
+    }
+  }, [isReady, load, placementId]);
 
-          {error && (
-            <div className="mt-3 text-xs text-rose-400 text-center">
-              GPS : {error}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ALERTE PLEIN ÉCRAN */}
-      {alertActive && (
-        <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center alert-flash px-6 text-center">
-          <div className="animate-bounce">
-            <svg className="w-24 h-24 text-white mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M12 2 2 22h20L12 2Z"/><path d="M12 9v6"/><circle cx="12" cy="18" r="1" fill="currentColor"/>
-            </svg>
-          </div>
-          <h1 className="text-3xl font-black text-white mt-6 drop-shadow-lg">Vous arrivez à destination !</h1>
-          <p className="text-white/90 mt-2 text-lg">
-            Distance : <span className="font-bold">{distance ? formatDistance(distance) : ''}</span>
-          </p>
-          <button
-            onClick={stopTracking}
-            className="mt-8 px-8 py-4 bg-white text-rose-600 rounded-2xl font-bold shadow-2xl btn-press text-lg"
-          >
-            Arrêter l'alarme
-          </button>
-          <p className="text-white/70 text-xs mt-4">Touchez le bouton pour stopper le suivi et le son.</p>
-        </div>
-      )}
-
-      {/* État initial : demande d'autorisation GPS */}
-      {permissionAsked && !position && !error && (
-        <div className="absolute inset-0 z-[900] flex items-center justify-center bg-slate-950/80 px-6">
-          <div className="glass rounded-3xl p-6 max-w-sm text-center">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-sky-500/20 flex items-center justify-center mb-4">
-              <svg className="w-7 h-7 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11a8 8 0 1 1 16 0c0 6.5-8 11-8 11Z"/><circle cx="12" cy="11" r="3"/></svg>
-            </div>
-            <h2 className="text-lg font-bold text-slate-100">Activation du GPS</h2>
-            <p className="text-sm text-slate-400 mt-2">
-              Autorisez la géolocalisation pour centrer la carte sur votre position et suivre votre trajet.
-            </p>
-            <div className="mt-4 w-full h-1.5 rounded-full bg-slate-700 overflow-hidden">
-              <div className="h-full w-1/2 bg-sky-400 animate-pulse"></div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return { isReady, isInitialized, show, load };
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+// Exemple d'overlay web (à utiliser si pas de SDK natif)
+// <UnityInterstitialOverlay placementId="BP_Interstitial_Android" />
+`};
+let currentFile='install';
+function highlight(code){ return code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') .replace(/(\/\/.*$|#.*$)/gm,'<span class="code-comment">$1</span>') .replace(/(&quot;|&#39;|"|'|`)(.*?)(\1)/g,'<span class="code-string">$1$2$3</span>') .replace(/\b(import|from|export|function|return|const|let|var|new|if|else|for|while|useEffect|useState|useRef|useCallback)\b/g,'<span class="code-keyword">$1</span>') .replace(/\b(\d+)\b/g,'<span class="code-num">$1</span>');}
+function renderCode(){ const raw=FILES[currentFile]; $('codeContent').innerHTML=highlight(raw); document.querySelectorAll('#codeTabs .code-tab').forEach(t=>t.classList.toggle('active',t.dataset.file===currentFile));}
+document.querySelectorAll('#codeTabs .code-tab').forEach(t=>t.onclick=()=>{currentFile=t.dataset.file;renderCode();});
+$('codeBtn').onclick=()=>{ $('codeModal').classList.add('open'); renderCode(); };
+$('codeClose').onclick=()=>$('codeModal').classList.remove('open');
+$('codeModal').addEventListener('click',e=>{ if(e.target===$('codeModal')) $('codeModal').classList.remove('open'); });
+$('copyCodeBtn').onclick=async()=>{ try{ await navigator.clipboard.writeText(FILES[currentFile]); toast('Code copié dans le presse-papiers','success'); } catch(e){ toast('Copie impossible','error'); }};
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('codeModal').classList.remove('open'); if($('unityInterstitial').classList.contains('active')) closeInterstitialOverlay(false); }});
+
+// Unity UI handlers
+$('unityToggle').onclick=e=>{ e.stopPropagation(); unityState.enabled=!unityState.enabled; if(unityState.enabled){ toast('Publicités Unity activées','success'); if(!unityState.initialized) initUnityAds(); else if(!unityState.ready) loadUnityInterstitial(); } else { toast('Publicités Unity désactivées','info'); } updateUnityUI(); };
+$('testInterstitialBtn').onclick=()=>{
+  if(!unityState.enabled){ toast('Activez d\'abord les publicités Unity','warn'); return; }
+  if(!unityState.initialized){ toast('Unity Ads en cours d\'initialisation...','warn'); initUnityAds(); return; }
+  if(unityState.ready){
+    showUnityInterstitial(()=>{}, true);
+  } else {
+    toast('Chargement de l\'interstitiel...','info');
+    loadUnityInterstitial();
+    setTimeout(()=>{ if(unityState.ready) showUnityInterstitial(()=>{}, true); }, 1600);
+  }
+};
+$('unityInfoBtn').onclick=()=>{ toast('Unity Ads • Placement: BP_Interstitial_Android • Game ID: '+unityState.gameId+' • Test Mode activé','info'); };
+$('skipAdBtn').onclick=()=>closeInterstitialOverlay(true);
+$('closeAdBtn').onclick=()=>{ if(unityCountdown<=0) closeInterstitialOverlay(true); else toast(`Patientez ${unityCountdown}s avant de passer`,'warn'); };
+$('adCtaBtn').onclick=()=>{ toast('Ouverture du Play Store... (simulation Unity Ads)','success'); setTimeout(()=>closeInterstitialOverlay(true), 600); };
+$('unityInterstitial').addEventListener('click', e=>{ if(e.target===$('unityInterstitial')) toast('Cliquez sur "Passer l\'annonce" pour continuer','info'); });
+
+initMap();
+setRadius(500);
+initUnityAds();
+requestLocation(true);
+updateStartButton();
+updateUnityUI();
+showSlide(0);
+setTimeout(()=>{ if(window.innerWidth<768 && !state.destPos) expandSheet(); },500);
+window.addEventListener('resize',()=>map.invalidateSize());
+document.addEventListener('visibilitychange',()=>{ if(document.hidden && state.tracking && state.alarmActive){ startVibrationLoop(); } });
 </script>
 </body>
 </html>
