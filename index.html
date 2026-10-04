@@ -2,1248 +2,670 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>ARRIVA — GPS Alarm & Smart Maps</title>
+<title>ARRIVA — Alerte Réveil GPS • تنبيه الوصول الذكي</title>
 <meta name="theme-color" content="#070b18">
-<meta name="description" content="ARRIVA — Réveil GPS intelligent sur Google Maps : alerte sonore et vibration à l'approche de votre arrêt. Calcul Haversine temps réel, Favoris nommés & multi-langue (AR/FR/EN).">
-
-<!-- Tailwind CSS -->
+<meta name="description" content="ARRIVA — منبه الوصول ونظام التنبيه الجغرافي الذكي. Réveil GPS transport intelligent et gestion des favoris nommés.">
 <script src="https://cdn.tailwindcss.com"></script>
-<!-- Leaflet CSS & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['"Cairo"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
-          display: ['"Space Grotesk"', '"Cairo"', 'sans-serif'],
-          mono: ['"JetBrains Mono"', 'monospace']
-        },
-        colors: {
-          ink: '#070b18',
-          panel: '#0d132a',
-          accent: '#6366f1',
-          neon: '#22d3ee',
-          alert: '#ff2d55',
-          gold: '#fbbf24',
-          lime: '#10b981'
-        },
-        boxShadow: {
-          glow: '0 0 35px rgba(99,102,241,0.4)',
-          alertGlow: '0 0 45px rgba(255,45,85,0.45)',
-          goldGlow: '0 0 30px rgba(251,191,36,0.35)'
-        }
+tailwind.config = {
+  darkMode: ['selector', '[data-theme="dark"]'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Cairo"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Space Grotesk"', '"Cairo"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace']
+      },
+      colors: {
+        ink: '#070b18', panel: '#0d132a', accent: '#6366f1', neon: '#22d3ee', alert: '#ff2d55', gold: '#fbbf24', emerald: '#10b981'
+      },
+      boxShadow: {
+        glow: '0 0 35px rgba(99,102,241,0.35)', alertGlow: '0 0 50px rgba(255,45,85,0.45)', goldGlow: '0 0 25px rgba(251,191,36,0.35)'
       }
     }
-  };
+  }
+};
 </script>
-
 <style>
-  :root {
-    --bg: #070b18;
-    --panel: rgba(13, 19, 42, 0.88);
-    --panel-solid: #0d132a;
-    --chip: rgba(255, 255, 255, 0.08);
-    --chip-hover: rgba(255, 255, 255, 0.14);
-    --text: #eef2f8;
-    --dim: #94a3b8;
-    --border: rgba(255, 255, 255, 0.12);
-  }
+:root { --bg:#070b18; --panel:rgba(13,19,42,0.92); --panel-solid:#0d132a; --chip:rgba(255,255,255,0.08); --chip-hover:rgba(255,255,255,0.14); --text:#eef2f8; --dim:#93a0b8; --border:rgba(255,255,255,0.12); }
+html[data-theme="light"] { --bg:#eaf0f8; --panel:rgba(255,255,255,0.95); --panel-solid:#ffffff; --chip:rgba(15,23,42,0.06); --chip-hover:rgba(15,23,42,0.12); --text:#0f172a; --dim:#5b6780; --border:rgba(15,23,42,0.12); }
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+html, body { height: 100%; overscroll-behavior: none; }
+body { margin:0; font-family:'Cairo','Plus Jakarta Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); overflow:hidden; transition:background .3s ease,color .3s ease; }
+html[dir="rtl"] { direction:rtl; text-align:right; }
+html[dir="ltr"] { direction:ltr; text-align:left; }
+#map { position:absolute; inset:0; z-index:0; background:var(--bg); }
+.leaflet-container { font-family:inherit; }
+.leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.65) !important; color:#94a3b8 !important; backdrop-filter:blur(8px); border-radius:6px; padding:2px 8px !important; }
+.leaflet-control-attribution a { color:#cbd5e1 !important; }
+.leaflet-control-zoom { display:none !important; }
+.leaflet-marker-icon { background:transparent !important; border:none !important; }
+.glass { background:var(--panel); backdrop-filter:blur(24px) saturate(1.5); -webkit-backdrop-filter:blur(24px) saturate(1.5); border:1px solid var(--border); }
+.glass-strong { background:var(--panel-solid); border:1px solid var(--border); }
+.chip { background:var(--chip); border:1px solid var(--border); color:var(--text); transition:all .2s ease; }
+.chip:hover { background:var(--chip-hover); }
+.text-dim { color:var(--dim) !important; }
+.reveal { opacity:0; transform:translateY(12px); animation:revealUp .65s cubic-bezier(0.16,1,0.3,1) forwards; }
+@keyframes revealUp { to { opacity:1; transform:none; } }
+.btn-tilt { transition:transform .2s cubic-bezier(0.34,1.4,0.64,1), box-shadow .2s, background .2s; }
+.btn-tilt:hover { transform:translateY(-2px); }
+.btn-tilt:active { transform:scale(0.96); }
+.user-wrap { position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+.user-radar { position:absolute; inset:-20px; border-radius:50%; background:conic-gradient(from 0deg, rgba(34,211,238,0.5), transparent 80deg, transparent); animation:spin 3s linear infinite; }
+.user-pulse-ring { position:absolute; inset:-12px; border-radius:50%; border:2px solid rgba(34,211,238,0.6); animation:ringPulse 2s ease-out infinite; }
+.user-dot { width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#22d3ee,#6366f1); border:3px solid #fff; box-shadow:0 0 18px rgba(34,211,238,0.85); position:relative; z-index:2; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes ringPulse { 0% { transform:scale(0.5); opacity:1; } 100% { transform:scale(1.4); opacity:0; } }
+.dest-pin-wrap { filter:drop-shadow(0 10px 16px rgba(255,45,85,0.5)); animation:pinDrop .5s cubic-bezier(0.34,1.56,0.64,1); }
+.dest-pin { width:44px; height:52px; animation:pinBounce 2.4s ease-in-out infinite; transform-origin:bottom center; }
+@keyframes pinDrop { 0% { transform:translateY(-50px) scale(0.6); opacity:0; } 100% { transform:translateY(0) scale(1); opacity:1; } }
+@keyframes pinBounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
+#bottomSheet { transition:transform .4s cubic-bezier(0.32,0.72,0.24,1); max-height:85vh; }
+#bottomSheet.collapsed { transform:translateY(calc(100% - 84px)); }
+@media(min-width:768px) { #bottomSheet { transform:none !important; max-height:none !important; } }
+.sheet-scroll { overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(99,102,241,0.3) transparent; }
+.sheet-scroll::-webkit-scrollbar { width:6px; }
+.sheet-scroll::-webkit-scrollbar-thumb { background:rgba(99,102,241,0.3); border-radius:99px; }
+input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:8px; border-radius:99px; background:linear-gradient(90deg,#6366f1,#22d3ee,#10b981); outline:none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px; border-radius:50%; background:#fff; border:4px solid #6366f1; box-shadow:0 4px 12px rgba(99,102,241,0.5); cursor:pointer; transition:transform .15s; }
+input[type=range]::-webkit-slider-thumb:active { transform:scale(1.2); }
+.btn-primary { background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 50%,#ec4899 100%); box-shadow:0 10px 30px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.3); position:relative; overflow:hidden; color:#fff; }
+.btn-primary:disabled { opacity:0.4; filter:grayscale(1); box-shadow:none; cursor:not-allowed; }
+.radius-btn.active { background:linear-gradient(135deg,#6366f1,#22d3ee); color:#fff; border-color:transparent; box-shadow:0 6px 18px rgba(99,102,241,0.45); transform:translateY(-2px); }
+.tone-btn.active { border-color:#6366f1 !important; background:rgba(99,102,241,0.18) !important; box-shadow:0 0 0 2px rgba(99,102,241,0.4); }
+#alarmOverlay { display:none; }
+#alarmOverlay.active { display:flex; }
+.alarm-bg { position:absolute; inset:0; background:radial-gradient(circle at 50% 30%, #ff2d55 0%, #9f1239 50%, #0a0f1e 100%); animation:alarmFlash 1s ease-in-out infinite; }
+@keyframes alarmFlash { 0%,100% { opacity:1; filter:brightness(1); } 50% { opacity:0.88; filter:brightness(1.3); } }
+.alarm-ring { animation:alarmShake .6s ease-in-out infinite; }
+@keyframes alarmShake { 0%,100% { transform:rotate(-7deg) scale(1); } 25% { transform:rotate(7deg) scale(1.06); } 50% { transform:rotate(-7deg) scale(1); } 75% { transform:rotate(7deg) scale(1.06); } }
+.live-dot { width:10px; height:10px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 0 rgba(34,197,94,0.7); animation:livePulse 1.6s infinite; }
+@keyframes livePulse { 70% { box-shadow:0 0 0 10px rgba(34,197,94,0); } 100% { box-shadow:0 0 0 0 rgba(34,197,94,0); } }
+.g-dot { width:9px; height:9px; border-radius:50%; background:conic-gradient(#4285F4 0 25%, #EA4335 0 50%, #FBBC05 0 75%, #34A853 0 100%); display:inline-block; }
+.ad-banner-box { border:1px solid rgba(251,191,36,0.35); background:linear-gradient(135deg, rgba(251,191,36,0.08) 0%, rgba(99,102,241,0.08) 100%); }
+.toast { animation:toastIn .35s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes toastIn { from { transform:translateY(16px); opacity:0; } to { transform:translateY(0); opacity:1; } }
 
-  html[data-theme="light"] {
-    --bg: #edf2f7;
-    --panel: rgba(255, 255, 255, 0.94);
-    --panel-solid: #ffffff;
-    --chip: rgba(15, 23, 42, 0.06);
-    --chip-hover: rgba(15, 23, 42, 0.12);
-    --text: #0f172a;
-    --dim: #64748b;
-    --border: rgba(15, 23, 42, 0.12);
-  }
-
-  * {
-    -webkit-tap-highlight-color: transparent;
-    box-sizing: border-box;
-  }
-
-  html, body {
-    height: 100%;
-    margin: 0;
-    overscroll-behavior: none;
-    font-family: 'Cairo', 'Plus Jakarta Sans', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    overflow: hidden;
-  }
-
-  /* RTL & LTR font balancing */
-  html[dir="ltr"] body {
-    font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
-  }
-
-  #map {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    background: var(--bg);
-  }
-
-  .leaflet-container {
-    font-family: inherit;
-  }
-
-  .leaflet-control-attribution {
-    font-size: 9px !important;
-    background: rgba(0, 0, 0, 0.65) !important;
-    color: #cbd5e1 !important;
-    backdrop-filter: blur(8px);
-    border-radius: 8px;
-    padding: 2px 8px !important;
-    margin: 6px !important;
-  }
-
-  .leaflet-control-zoom {
-    display: none !important;
-  }
-
-  .leaflet-marker-icon {
-    background: transparent !important;
-    border: none !important;
-  }
-
-  .glass {
-    background: var(--panel);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 1px solid var(--border);
-  }
-
-  .glass-strong {
-    background: var(--panel-solid);
-    border: 1px solid var(--border);
-  }
-
-  .chip {
-    background: var(--chip);
-    border: 1px solid var(--border);
-    color: var(--text);
-    transition: all 0.2s ease;
-  }
-
-  .chip:hover {
-    background: var(--chip-hover);
-  }
-
-  .text-dim {
-    color: var(--dim) !important;
-  }
-
-  /* User radar pulse */
-  .user-wrap {
-    position: relative;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .user-radar {
-    position: absolute;
-    inset: -20px;
-    border-radius: 50%;
-    background: conic-gradient(from 0deg, rgba(34, 211, 238, 0.55), transparent 75deg, transparent);
-    animation: spinRadar 2.6s linear infinite;
-  }
-  .user-pulse-ring {
-    position: absolute;
-    inset: -10px;
-    border-radius: 50%;
-    border: 2px solid rgba(34, 211, 238, 0.6);
-    animation: ringPulse 2s ease-out infinite;
-  }
-  .user-dot {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    position: relative;
-    z-index: 2;
-    background: linear-gradient(135deg, #22d3ee, #6366f1);
-    border: 3px solid #fff;
-    box-shadow: 0 0 18px rgba(34, 211, 238, 0.85);
-  }
-
-  @keyframes spinRadar {
-    to { transform: rotate(360deg); }
-  }
-  @keyframes ringPulse {
-    0% { transform: scale(0.6); opacity: 1; }
-    100% { transform: scale(1.5); opacity: 0; }
-  }
-
-  /* Destination pin */
-  .dest-pin-wrap {
-    filter: drop-shadow(0 12px 20px rgba(255, 45, 85, 0.5));
-    animation: pinDrop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .dest-pin {
-    width: 44px;
-    height: 52px;
-    animation: pinBounce 2.2s ease-in-out infinite;
-    transform-origin: bottom center;
-  }
-  @keyframes pinDrop {
-    0% { transform: translateY(-60px) scale(0.6); opacity: 0; }
-    100% { transform: translateY(0) scale(1); opacity: 1; }
-  }
-  @keyframes pinBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
-  }
-
-  /* Buttons & Interactions */
-  .btn-tilt {
-    transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.2s, background 0.2s;
-  }
-  .btn-tilt:hover {
-    transform: translateY(-2px);
-  }
-  .btn-tilt:active {
-    transform: scale(0.95);
-  }
-
-  .btn-primary {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
-    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-    position: relative;
-    overflow: hidden;
-    color: #fff;
-    transition: all 0.25s ease;
-  }
-  .btn-primary::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -60%;
-    width: 40%;
-    height: 100%;
-    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
-    transform: skewX(-20deg);
-    animation: shine 4s ease-in-out infinite;
-  }
-  @keyframes shine {
-    0% { left: -60%; }
-    50%, 100% { left: 140%; }
-  }
-  .btn-primary:disabled {
-    opacity: 0.45;
-    filter: grayscale(0.8);
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-  .btn-primary:disabled::after {
-    display: none;
-  }
-
-  .radius-pill.active {
-    background: linear-gradient(135deg, #6366f1, #22d3ee);
-    color: #fff;
-    border-color: transparent;
-    box-shadow: 0 4px 18px rgba(99, 102, 241, 0.45);
-    transform: scale(1.04);
-  }
-
-  .alarm-type.active {
-    border-color: #6366f1 !important;
-    background: rgba(99, 102, 241, 0.18) !important;
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
-  }
-
-  /* Switch toggle */
-  .toggle {
-    width: 44px;
-    height: 25px;
-    border-radius: 99px;
-    position: relative;
-    cursor: pointer;
-    background: rgba(148, 163, 184, 0.3);
-    transition: background 0.25s ease;
-    flex-shrink: 0;
-  }
-  .toggle::after {
-    content: '';
-    position: absolute;
-    top: 2.5px;
-    left: 3px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #fff;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  }
-  html[dir="rtl"] .toggle::after {
-    left: auto;
-    right: 3px;
-  }
-  .toggle.on {
-    background: linear-gradient(90deg, #22d3ee, #6366f1);
-  }
-  .toggle.on::after {
-    transform: translateX(18px);
-  }
-  html[dir="rtl"] .toggle.on::after {
-    transform: translateX(-18px);
-  }
-
-  /* Range input */
-  input[type=range] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 8px;
-    border-radius: 99px;
-    background: linear-gradient(90deg, #6366f1, #22d3ee, #10b981);
-    outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #fff;
-    border: 3px solid #6366f1;
-    box-shadow: 0 3px 12px rgba(99, 102, 241, 0.5);
-    cursor: pointer;
-    transition: transform 0.15s;
-  }
-  input[type=range]::-webkit-slider-thumb:active {
-    transform: scale(1.2);
-  }
-
-  /* Bottom sheet */
-  #bottomSheet {
-    transition: transform 0.45s cubic-bezier(0.32, 0.72, 0.24, 1);
-    max-height: 85vh;
-  }
-  #bottomSheet.collapsed {
-    transform: translateY(calc(100% - 84px));
-  }
-  @media (min-width: 768px) {
-    #bottomSheet {
-      transform: none !important;
-      max-height: calc(100vh - 32px);
-    }
-  }
-
-  .sheet-scroll {
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(99,102,241,.3) transparent;
-  }
-  .sheet-scroll::-webkit-scrollbar {
-    width: 4px;
-  }
-  .sheet-scroll::-webkit-scrollbar-thumb {
-    background: rgba(99,102,241,.3);
-    border-radius: 99px;
-  }
-
-  /* Live dot */
-  .live-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #10b981;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    animation: livePulse 1.6s infinite;
-  }
-  @keyframes livePulse {
-    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-  }
-
-  /* Google multicolor dot */
-  .g-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    display: inline-block;
-    background: conic-gradient(#4285F4 0 25%, #EA4335 0 50%, #FBBC05 0 75%, #34A853 0 100%);
-    box-shadow: 0 0 6px rgba(66, 133, 244, 0.6);
-  }
-
-  /* Alarm Overlay Flash */
-  #alarmOverlay { display: none; }
-  #alarmOverlay.active { display: flex; }
-  .alarm-bg {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 50% 30%, #ff2d55 0%, #9f1239 50%, #060914 100%);
-    animation: alarmFlash 0.9s ease-in-out infinite;
-  }
-  @keyframes alarmFlash {
-    0%, 100% { opacity: 1; filter: brightness(1); }
-    50% { opacity: 0.85; filter: brightness(1.35); }
-  }
-  .alarm-shake {
-    animation: alarmShake 0.6s ease-in-out infinite;
-  }
-  @keyframes alarmShake {
-    0%, 100% { transform: rotate(-8deg); }
-    50% { transform: rotate(8deg); }
-  }
-
-  /* Toasts */
-  .toast {
-    animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  @keyframes toastIn {
-    from { transform: translateY(16px) scale(0.9); opacity: 0; }
-    to { transform: translateY(0) scale(1); opacity: 1; }
-  }
-  .toast.out {
-    animation: toastOut 0.25s ease forwards;
-  }
-  @keyframes toastOut {
-    to { transform: translateY(12px); opacity: 0; }
-  }
-
-  /* Sound Wave EQ */
-  .eq { display: flex; gap: 3px; align-items: flex-end; height: 16px; }
-  .eq span { width: 3.5px; background: #22d3ee; border-radius: 99px; animation: eqAnim 0.8s ease-in-out infinite; }
-  .eq span:nth-child(2) { animation-delay: 0.15s; background: #6366f1; }
-  .eq span:nth-child(3) { animation-delay: 0.3s; background: #d946ef; }
-  @keyframes eqAnim { 0%, 100% { height: 4px; } 50% { height: 16px; } }
-
-  /* Map Option item */
-  .map-opt {
-    transition: all 0.2s ease;
-  }
-  .map-opt.active {
-    border-color: rgba(99, 102, 241, 0.7) !important;
-    background: rgba(99, 102, 241, 0.15);
-  }
-
-  /* Ad Banner Box */
-  #bannerAd {
-    position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: 96px;
-    max-width: 420px;
-    margin: 0 auto;
-    z-index: 1002;
-    animation: toastIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  @media (min-width: 768px) {
-    #bannerAd {
-      left: auto;
-      right: 18px;
-      bottom: 18px;
-      margin: 0;
-      width: 360px;
-    }
-    html[dir="rtl"] #bannerAd {
-      right: auto;
-      left: 18px;
-    }
-  }
-
-  /* Modals */
-  #favModal.open { display: flex !important; }
-  #adOverlay.active { display: flex !important; }
-
-  .safe-bottom {
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 14px);
-  }
+/* ===== HAMBURGER DRAWER ===== */
+#navScrim { opacity:0; pointer-events:none; transition:opacity .3s ease; }
+#navScrim.open { opacity:1; pointer-events:auto; }
+html[dir="ltr"] #navDrawer { left:0; transform:translateX(-105%); }
+html[dir="ltr"] #navDrawer.open { transform:translateX(0); }
+html[dir="rtl"] #navDrawer { right:0; transform:translateX(105%); }
+html[dir="rtl"] #navDrawer.open { transform:translateX(0); }
+#navDrawer { transition:transform .35s cubic-bezier(0.32,0.72,0.24,1); }
+.nav-section-icon { width:34px; height:34px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nav-accordion-body { max-height:0; overflow:hidden; transition:max-height .4s ease; }
+.nav-accordion.open .nav-accordion-body { max-height:800px; }
+.nav-accordion .nav-chev { transition:transform .3s ease; }
+.nav-accordion.open .nav-chev { transform:rotate(90deg); }
+.nav-lang-btn.active { background:linear-gradient(135deg,#6366f1,#22d3ee); color:#fff; border-color:transparent; box-shadow:0 6px 18px rgba(99,102,241,0.45); }
+.map-layer-row.active { border-color:#6366f1 !important; background:rgba(99,102,241,0.2) !important; }
+.hamburger-line { transition:transform .3s ease, opacity .2s ease; }
+.nav-open #map { pointer-events:none; }
+.toggle-track { width:44px; height:26px; border-radius:99px; transition:background .25s ease; padding:3px; display:flex; align-items:center; cursor:pointer; }
+.toggle-track.on { background:linear-gradient(135deg,#6366f1,#22d3ee); }
+.toggle-track.off { background:rgba(120,130,150,0.4); }
+.toggle-knob { width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.3); transition:transform .25s cubic-bezier(0.34,1.4,0.64,1); }
+html[dir="ltr"] .toggle-track.on .toggle-knob { transform:translateX(18px); }
+html[dir="rtl"] .toggle-track.on .toggle-knob { transform:translateX(-18px); }
 </style>
 </head>
-<body class="relative select-none">
+<body>
 
-<!-- ===== MAP CANVAS (Google Maps & Open Providers) ===== -->
-<div id="map" aria-label="Interactive Navigation Map"></div>
+<!-- CARTE PLEIN ÉCRAN -->
+<div id="map" aria-label="Google Maps Carte Interactive"></div>
 
-<!-- ===== TOP FLOATING HEADER ===== -->
+<!-- EN-TÊTE FLOTTANT -->
 <header class="absolute top-0 inset-x-0 z-[1000] p-3 md:p-4 pointer-events-none">
   <div class="w-full max-w-md mx-auto md:mx-0 md:max-w-[440px] pointer-events-auto flex flex-col gap-2">
-    
-    <!-- Top Row: Logo, Lang, Favs, Theme -->
+
+    <!-- Barre d'outils supérieure -->
     <div class="flex items-center justify-between gap-2">
-      <!-- App Brand -->
+      <!-- Logo -->
       <div class="glass rounded-2xl px-3 py-2 flex items-center gap-2.5 shadow-lg">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-glow">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>
-          </svg>
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-glow">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
         </div>
-        <div class="leading-tight">
-          <div class="font-display font-black text-[15px] tracking-tight flex items-center gap-1.5">
-            <span>ARRIVA</span>
-            <span class="g-dot" title="Google Maps Layer Available"></span>
+        <div>
+          <div class="font-bold text-[15px] tracking-tight flex items-center gap-1.5 leading-none">
+            <span id="appLogoTitle">ARRIVA</span>
+            <span class="g-dot" title="Google Maps"></span>
           </div>
-          <div class="text-[9px] text-dim font-bold tracking-wider uppercase" data-i18n="appSubtitle">Google Maps • Réveil GPS</div>
+          <div class="text-[9px] text-dim font-bold tracking-wider uppercase mt-1" id="appSubTitle">خرائط جوجل • منبه GPS الذكي</div>
         </div>
       </div>
 
-      <!-- Actions: Lang, Favorites, Theme -->
+      <!-- Boutons : Hamburger + Thème rapide -->
       <div class="flex items-center gap-1.5">
-        <!-- Language Selector -->
-        <div class="relative">
-          <button id="langBtn" class="glass px-2.5 h-10 rounded-xl flex items-center gap-1.5 btn-tilt text-[12px] font-black" title="Changer la langue / تغيير اللغة">
-            <span id="langCurrentLabel">العربية</span>
-            <span class="text-[9px] opacity-70">▼</span>
-          </button>
-          <div id="langMenu" class="hidden absolute top-full mt-1.5 z-[1200] end-0 glass-strong rounded-2xl p-1.5 shadow-2xl border flex flex-col gap-1 min-w-[125px]">
-            <button data-lang="ar" class="lang-opt px-3 py-1.5 rounded-xl text-[12px] font-bold text-start hover:bg-white/10 flex items-center justify-between">
-              <span>🇸🇦 العربية</span>
-            </button>
-            <button data-lang="fr" class="lang-opt px-3 py-1.5 rounded-xl text-[12px] font-bold text-start hover:bg-white/10 flex items-center justify-between">
-              <span>🇫🇷 Français</span>
-            </button>
-            <button data-lang="en" class="lang-opt px-3 py-1.5 rounded-xl text-[12px] font-bold text-start hover:bg-white/10 flex items-center justify-between">
-              <span>🇬🇧 English</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Favorites Modal Trigger -->
-        <button id="openFavsBtn" class="glass px-3 h-10 rounded-xl flex items-center gap-1.5 btn-tilt text-amber-300 font-bold text-[12.5px]" title="Favoris">
-          <span>⭐</span>
-          <span class="hidden sm:inline" data-i18n="favsBtn">Favoris</span>
-          <span id="favCountBadge" class="hidden w-4 h-4 rounded-full bg-amber-400 text-black text-[9px] font-black items-center justify-center">0</span>
-        </button>
-
-        <!-- Dark / Light Theme -->
-        <button id="themeBtn" class="glass w-10 h-10 rounded-xl flex items-center justify-center btn-tilt hover:bg-white/10" title="Thème">
-          <svg id="iconMoon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-          <svg id="iconSun" class="hidden" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <!-- BOUTON HAMBURGER -->
+        <button id="navToggleBtn" aria-label="فتح القائمة" aria-expanded="false" aria-controls="navDrawer" title="Menu" class="glass w-10 h-10 rounded-2xl flex items-center justify-center btn-tilt shadow-lg relative">
+          <span class="sr-only">Menu</span>
+          <span class="flex flex-col gap-[5px] items-center justify-center">
+            <span class="hamburger-line block w-5 h-[2.5px] rounded-full bg-current"></span>
+            <span class="hamburger-line block w-5 h-[2.5px] rounded-full bg-current"></span>
+            <span class="hamburger-line block w-5 h-[2.5px] rounded-full bg-current"></span>
+          </span>
         </button>
       </div>
     </div>
 
-    <!-- Search Bar -->
+    <!-- Recherche -->
     <div class="glass rounded-2xl relative shadow-xl">
       <div class="flex items-center gap-2 px-3.5 py-2.5">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.4" stroke-linecap="round">
-          <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
-        </svg>
-        <input id="searchInput" type="text" autocomplete="off" placeholder="Rechercher une destination, gare, métro, adresse…" class="bg-transparent outline-none flex-1 text-[13.5px] font-medium placeholder:text-slate-400 min-w-0" style="color:var(--text)">
-        <button id="searchClear" class="hidden w-6 h-6 rounded-lg chip items-center justify-center text-[11px] font-bold" aria-label="Clear">✕</button>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="searchInput" type="text" autocomplete="off" placeholder="ابحث عن محطة، عنوان، موقف أو مكان..." class="bg-transparent outline-none flex-1 text-[13.5px] font-medium min-w-0" style="color:var(--text)" />
+        <button id="searchClear" class="hidden w-6 h-6 rounded-lg chip items-center justify-center text-[11px] font-bold">✕</button>
         <div id="searchSpinner" class="hidden w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
-      <div id="searchResults" class="hidden absolute top-full inset-x-0 mt-2 glass-strong rounded-2xl overflow-hidden shadow-2xl border z-[1100] max-h-[260px] overflow-y-auto"></div>
+      <div id="searchResults" class="hidden absolute top-full inset-x-0 mt-2 glass-strong rounded-2xl overflow-hidden shadow-2xl border z-[1100] max-h-[250px] overflow-y-auto"></div>
     </div>
 
-    <!-- Status Badges -->
-    <div class="flex gap-1.5 flex-wrap items-center">
-      <div class="glass rounded-full px-3 py-1 text-[11px] font-bold flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse" id="gpsDot"></span>
-        <span id="gpsText" data-i18n="locatingGps">Localisation GPS…</span>
+    <!-- Badges Statut GPS & Type de Carte -->
+    <div class="flex gap-2 flex-wrap items-center">
+      <div class="glass rounded-full px-3 py-1.5 text-[11px] font-bold flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse" id="gpsStatusDot"></span>
+        <span id="gpsStatusText">جاري البحث عن GPS...</span>
       </div>
-
-      <div id="destBadge" class="glass rounded-full px-3 py-1 text-[11px] font-bold hidden items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-[#ff2d55]"></span>
-        <span id="destBadgeText" class="truncate max-w-[130px]" data-i18n="destination">Destination</span>
-      </div>
-
-      <button id="mapBadgeBtn" class="glass rounded-full px-3 py-1 text-[11px] font-bold flex items-center gap-1.5 btn-tilt">
+      <button id="mapTypeToggleBtn" class="glass rounded-full px-3 py-1.5 text-[11px] font-bold flex items-center gap-1.5 btn-tilt">
         <span class="g-dot"></span>
-        <span id="mapBadgeText">Google Maps</span>
-        <span class="opacity-60 text-[9px]">▼</span>
+        <span id="mapTypeName">Google Maps</span>
+        <span class="opacity-60 text-[8px]">▼</span>
       </button>
     </div>
-
   </div>
 </header>
 
-<!-- ===== MAP CONTROLS (Right/Left depending on RTL) ===== -->
-<div class="absolute end-3 md:end-4 top-[190px] md:top-[205px] z-[1000] flex flex-col gap-2">
-  <button id="locateBtn" title="Ma position" class="glass w-11 h-11 rounded-2xl flex items-center justify-center btn-tilt shadow-lg">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-      <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/>
-    </svg>
+<!-- BOUTONS FLOTTANTS SUR LA CARTE -->
+<div class="absolute right-3 md:right-4 top-[210px] z-[1000] flex flex-col gap-2">
+  <button id="locateMeBtn" title="موقعي الحالي" class="glass w-11 h-11 rounded-2xl flex items-center justify-center btn-tilt shadow-lg text-cyan-400">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
   </button>
-  <button id="fitBtn" title="Aperçu du trajet" class="glass w-11 h-11 rounded-2xl hidden items-center justify-center btn-tilt shadow-lg">
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M16 21h3a2 2 0 0 0 2-2v-3M8 21H5a2 2 0 0 1-2-2v-3"/>
-    </svg>
+  <button id="fitRouteBtn" title="عرض المسار بالكامل" class="glass w-11 h-11 rounded-2xl hidden items-center justify-center btn-tilt shadow-lg text-indigo-400">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M16 21h3a2 2 0 0 0 2-2v-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
   </button>
-  <button id="layersBtn" title="Fonds de carte" class="glass w-11 h-11 rounded-2xl flex items-center justify-center btn-tilt shadow-lg border-indigo-500/40">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>
-    </svg>
+  <button id="mapLayersMenuBtn" title="تغيير الخريطة" class="glass w-11 h-11 rounded-2xl flex items-center justify-center btn-tilt shadow-lg border-indigo-500/40">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
   </button>
-  <button id="zoomIn" title="Zoom +" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold btn-tilt shadow-lg">+</button>
-  <button id="zoomOut" title="Zoom -" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold btn-tilt shadow-lg">−</button>
+  <button id="zoomInBtn" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-lg font-bold btn-tilt shadow-lg">+</button>
+  <button id="zoomOutBtn" class="glass w-11 h-11 rounded-2xl flex items-center justify-center text-lg font-bold btn-tilt shadow-lg">−</button>
 </div>
 
-<!-- ===== MAP LAYER PICKER POPUP ===== -->
-<div id="mapStylePop" class="hidden absolute end-[68px] md:end-[72px] top-[190px] md:top-[205px] z-[1001] glass-strong rounded-2xl p-3 w-[275px] shadow-2xl">
-  <div class="flex items-center justify-between mb-2 px-1">
-    <div>
-      <div class="font-display font-bold text-[13px] flex items-center gap-1.5">
-        <span data-i18n="mapType">Fonds de carte</span>
-        <span class="g-dot"></span>
-      </div>
-      <div class="text-[10px] text-dim font-semibold">Google Maps • CARTO • OSM</div>
+<!-- MENU FOND DE CARTE (POPUP RAPIDE) -->
+<div id="mapStylePop" class="hidden absolute right-[68px] top-[210px] z-[1001] glass-strong rounded-2xl p-3 w-[270px] shadow-2xl">
+  <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-white/10">
+    <div class="font-bold text-[13px] flex items-center gap-1.5">
+      <span id="txtMapSelectTitle">نوع الخريطة</span>
+      <span class="g-dot"></span>
     </div>
-    <button id="mapPopClose" class="w-6 h-6 rounded-lg chip text-[11px] font-bold">✕</button>
+    <button id="closeMapPopBtn" class="w-6 h-6 rounded-lg chip text-[11px] font-bold">✕</button>
   </div>
-  <div id="mapStyleList" class="flex flex-col gap-1.5"></div>
+  <div id="mapLayersListPop" class="flex flex-col gap-1.5"></div>
 </div>
 
-<!-- ===== MINI COMPASS / DISTANCE WIDGET ===== -->
-<div id="miniCompass" class="hidden absolute start-3 md:start-4 top-[190px] md:top-[205px] z-[1000] glass rounded-2xl p-2.5 w-[84px] text-center shadow-xl">
-  <div class="relative w-12 h-12 mx-auto rounded-full chip flex items-center justify-center overflow-hidden">
-    <div class="absolute text-[8px] font-black top-0.5 text-dim">N</div>
-    <svg id="compassArrow" width="24" height="24" viewBox="0 0 24 24" fill="#ff2d55" style="transition: transform 0.5s ease;">
-      <path d="M12 2 19 21l-7-4-7 4z"/>
-    </svg>
+<!-- ============ NAVIGATION DRAWER (HAMBURGER) ============ -->
+<div id="navScrim" class="fixed inset-0 z-[1500] bg-black/60 backdrop-blur-sm"></div>
+<aside id="navDrawer" class="fixed top-0 bottom-0 z-[1501] w-[310px] max-w-[86vw] glass-strong shadow-2xl flex flex-col" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="navDrawerTitle" tabindex="-1">
+  <!-- Header -->
+  <div class="flex items-center justify-between px-4 py-3.5 border-b border-white/10">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-glow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+      </div>
+      <div>
+        <div class="font-bold text-[15px] flex items-center gap-1.5 leading-none"><span>ARRIVA</span><span class="g-dot"></span></div>
+        <div class="text-[9px] text-dim font-bold tracking-wider uppercase mt-1" id="navDrawerTitle">القائمة</div>
+      </div>
+    </div>
+    <button id="navCloseBtn" class="w-8 h-8 rounded-xl chip flex items-center justify-center text-[12px] font-bold btn-tilt" aria-label="إغلاق">✕</button>
   </div>
-  <div id="compassDist" class="mt-1 text-[11.5px] font-display font-bold">—</div>
-  <div class="text-[8.5px] text-dim font-bold uppercase tracking-wider" data-i18n="remaining">restants</div>
-</div>
 
-<!-- ===== MAIN BOTTOM SHEET / CONTROL DRAWER ===== -->
-<div id="bottomSheet" class="absolute bottom-0 inset-x-0 md:inset-x-auto md:start-4 md:bottom-4 md:w-[420px] z-[1001]">
-  <div class="glass md:rounded-3xl rounded-t-[28px] border-b-0 md:border-b overflow-hidden shadow-2xl">
-    
-    <!-- Mobile drag handle -->
-    <button id="sheetHandle" class="w-full pt-3 pb-1.5 flex flex-col items-center gap-1 cursor-pointer md:cursor-default" aria-label="Toggle drawer">
-      <div class="w-12 h-1.5 rounded-full bg-slate-400/50 md:hidden"></div>
-      <div id="sheetHint" class="text-[9.5px] font-bold tracking-wider uppercase text-dim md:hidden" data-i18n="sheetHintOpen">Glisser pour afficher</div>
+  <!-- Contenu défilant -->
+  <div class="flex-1 overflow-y-auto p-3 space-y-2 sheet-scroll" id="navBody">
+
+    <!-- ===== SECTION : CARTE ===== -->
+    <div class="nav-accordion open" data-section="map">
+      <button class="nav-accordion-head w-full flex items-center gap-3 p-3 rounded-2xl chip btn-tilt" aria-expanded="true">
+        <span class="nav-section-icon bg-gradient-to-br from-cyan-500 to-blue-500 text-white">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+        </span>
+        <span id="navSecMap" class="font-bold text-[14px] flex-1 text-start">الخريطة</span>
+        <svg class="nav-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(0deg)"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <div class="nav-accordion-body">
+        <div class="pt-2 px-1 space-y-1.5" id="navMapLayersList"></div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION : FAVORIS ===== -->
+    <div class="nav-accordion" data-section="fav">
+      <button class="nav-accordion-head w-full flex items-center gap-3 p-3 rounded-2xl chip btn-tilt" aria-expanded="false">
+        <span class="nav-section-icon bg-gradient-to-br from-amber-400 to-orange-500 text-white">⭐</span>
+        <span id="navSecFav" class="font-bold text-[14px] flex-1 text-start">المفضلة</span>
+        <span id="navFavBadge" class="hidden px-2 py-0.5 rounded-full bg-amber-400 text-black text-[10px] font-black">0</span>
+        <svg class="nav-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <div class="nav-accordion-body">
+        <div class="pt-2 px-1 space-y-3">
+          <div>
+            <label id="lblFavInput" class="block text-[11.5px] font-bold text-amber-400 mb-1.5">حفظ الوجهة الحالية باسم مخصص :</label>
+            <div class="flex gap-2">
+              <input id="inputFavCustomName" type="text" placeholder="مثال: البيت، محطة القطار، العمل، الجامعة..." class="chip rounded-xl px-3 py-2 text-[13px] font-medium flex-1 outline-none focus:border-amber-400 min-w-0" />
+              <button id="btnSaveFavoriteSubmit" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-black text-[12px] font-black btn-tilt shadow-goldGlow shrink-0"><span id="txtSaveConfirm">حفظ</span></button>
+            </div>
+            <div class="flex gap-1.5 mt-2.5 flex-wrap">
+              <button class="fav-quick-tag chip rounded-full px-2.5 py-1 text-[11px] font-bold text-amber-300 border-amber-400/30">🏠 المنزل</button>
+              <button class="fav-quick-tag chip rounded-full px-2.5 py-1 text-[11px] font-bold text-amber-300 border-amber-400/30">💼 العمل</button>
+              <button class="fav-quick-tag chip rounded-full px-2.5 py-1 text-[11px] font-bold text-amber-300 border-amber-400/30">🚉 المحطة</button>
+              <button class="fav-quick-tag chip rounded-full px-2.5 py-1 text-[11px] font-bold text-amber-300 border-amber-400/30">🎓 الجامعة</button>
+              <button class="fav-quick-tag chip rounded-full px-2.5 py-1 text-[11px] font-bold text-amber-300 border-amber-400/30">🕌 المسجد</button>
+            </div>
+          </div>
+          <div id="favListItemsContainer" class="flex flex-col gap-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION : LANGUE ===== -->
+    <div class="nav-accordion" data-section="lang">
+      <button class="nav-accordion-head w-full flex items-center gap-3 p-3 rounded-2xl chip btn-tilt" aria-expanded="false">
+        <span class="nav-section-icon bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+        </span>
+        <span id="navSecLang" class="font-bold text-[14px] flex-1 text-start">اللغة</span>
+        <svg class="nav-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <div class="nav-accordion-body">
+        <div class="pt-2 px-1 grid grid-cols-3 gap-2">
+          <button id="langBtnAr" data-lang="ar" class="nav-lang-btn chip rounded-xl py-2.5 text-[13px] font-bold active">عربي</button>
+          <button id="langBtnFr" data-lang="fr" class="nav-lang-btn chip rounded-xl py-2.5 text-[13px] font-bold">FR</button>
+          <button id="langBtnEn" data-lang="en" class="nav-lang-btn chip rounded-xl py-2.5 text-[13px] font-bold">EN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION : PARAMÈTRES ===== -->
+    <div class="nav-accordion" data-section="settings">
+      <button class="nav-accordion-head w-full flex items-center gap-3 p-3 rounded-2xl chip btn-tilt" aria-expanded="false">
+        <span class="nav-section-icon bg-gradient-to-br from-pink-500 to-rose-500 text-white">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </span>
+        <span id="navSecSettings" class="font-bold text-[14px] flex-1 text-start">الإعدادات</span>
+        <svg class="nav-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <div class="nav-accordion-body">
+        <div class="pt-2 px-1 space-y-3">
+          <!-- Tonalités -->
+          <div>
+            <div class="text-[11.5px] font-bold text-dim mb-1.5" id="txtSettingsTone">نغمة المنبه</div>
+            <div class="grid grid-cols-3 gap-2">
+              <button data-tone="siren" class="tone-btn active rounded-2xl p-2.5 text-center border chip">
+                <div class="text-xl">🚨</div><div id="txtToneSiren" class="text-[11px] font-bold mt-1">صفارة قوية</div>
+              </button>
+              <button data-tone="urgent" class="tone-btn rounded-2xl p-2.5 text-center border chip">
+                <div class="text-xl">⏰</div><div id="txtToneUrgent" class="text-[11px] font-bold mt-1">تنبيه متكرر</div>
+              </button>
+              <button data-tone="soft" class="tone-btn rounded-2xl p-2.5 text-center border chip">
+                <div class="text-xl">🔔</div><div id="txtToneSoft" class="text-[11px] font-bold mt-1">جرس ناعم</div>
+              </button>
+            </div>
+            <button id="btnTestAudio" class="mt-2 w-full rounded-xl py-2.5 text-[12px] font-bold chip flex items-center justify-center gap-2 btn-tilt">
+              <span id="iconTestAudio">▶</span><span id="txtTestAudio">تجربة النغمة</span>
+            </button>
+          </div>
+          <!-- Vibration -->
+          <div class="flex items-center justify-between chip rounded-xl px-3 py-2.5">
+            <span id="txtVibrateLabel" class="text-[12.5px] font-bold">📳 الاهتزاز</span>
+            <div id="toggleVibration" class="toggle-track on" role="switch" aria-checked="true" tabindex="0">
+              <span class="toggle-knob"></span>
+            </div>
+          </div>
+          <!-- Thème -->
+          <div class="flex items-center justify-between chip rounded-xl px-3 py-2.5">
+            <span id="txtThemeLabel" class="text-[12.5px] font-bold">🌙 الوضع الليلي</span>
+            <div id="themeToggleBtn" class="toggle-track on" role="switch" aria-checked="true" tabindex="0">
+              <span class="toggle-knob"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION : À PROPOS ===== -->
+    <div class="nav-accordion" data-section="about">
+      <button class="nav-accordion-head w-full flex items-center gap-3 p-3 rounded-2xl chip btn-tilt" aria-expanded="false">
+        <span class="nav-section-icon bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        </span>
+        <span id="navSecAbout" class="font-bold text-[14px] flex-1 text-start">حول التطبيق</span>
+        <svg class="nav-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <div class="nav-accordion-body">
+        <div class="pt-2 px-1 space-y-3 text-[12px] leading-relaxed">
+          <p id="aboutDesc" class="text-dim">ARRIVA هو منبه ذكي يعتمد على تحديد المواقع GPS وخرائط جوجل. يوقظك تلقائياً قبل الوصول إلى محطتك أثناء التنقل بالحافلة أو القطار.</p>
+          <div class="chip rounded-xl p-3 space-y-2">
+            <div class="font-bold text-[12.5px] text-amber-300" id="apkTitle">📱 تحويل إلى تطبيق APK</div>
+            <ol class="list-decimal ms-5 space-y-1.5 text-[11.5px] text-dim" id="apkSteps">
+              <li><b class="text-white">PWA</b> : افتح الموقع في متصفح الهاتف ← قائمة ⋮ ← «إضافة إلى الشاشة الرئيسية».</li>
+              <li><b class="text-white">Capacitor</b> : <code class="text-cyan-300">npm i @capacitor/core @capacitor/android</code> ثم <code class="text-cyan-300">npx cap add android</code> وأخيراً <code class="text-cyan-300">./gradlew assembleDebug</code>.</li>
+              <li><b class="text-white">Bubblewrap (TWA)</b> : <code class="text-cyan-300">npx @bubblewrap/cli init --manifest=https://votre-site/manifest.json</code> ثم <code class="text-cyan-300">build</code>.</li>
+              <li><b class="text-white">Cordova</b> : <code class="text-cyan-300">cordova create arriva</code> ثم <code class="text-cyan-300">cordova platform add android</code> و <code class="text-cyan-300">cordova build android</code>.</li>
+            </ol>
+            <button id="btnInstallPwa" class="hidden w-full mt-1 rounded-xl py-2 bg-gradient-to-r from-indigo-500 to-cyan-400 text-white text-[12px] font-bold btn-tilt">⬇ تثبيت التطبيق (PWA)</button>
+          </div>
+          <div class="text-center text-[10px] text-dim pt-1">ARRIVA v1.0 • © 2025</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</aside>
+
+<!-- PANNEAU INFÉRIEUR (BOTTOM SHEET) -->
+<div id="bottomSheet" class="absolute bottom-0 inset-x-0 md:inset-x-auto md:left-4 md:bottom-4 md:w-[420px] z-[1001]">
+  <div class="glass md:rounded-3xl rounded-t-[30px] border-b-0 md:border-b overflow-hidden shadow-2xl">
+    <button id="sheetHandleBtn" class="w-full pt-3 pb-1.5 flex flex-col items-center gap-1 cursor-pointer md:cursor-default" aria-label="Panneau">
+      <div class="w-12 h-1.5 rounded-full bg-slate-400/40 md:hidden"></div>
+      <div id="sheetHintText" class="text-[9.5px] font-bold uppercase tracking-wider text-dim md:hidden">اسحب لتكبير الخريطة</div>
     </button>
-
-    <div class="sheet-scroll px-4 md:px-5 pb-4 safe-bottom" style="max-height: calc(85vh - 44px)">
-      
-      <!-- ==================== VIEW 1: SETUP PANEL ==================== -->
-      <div id="panelSetup">
-        
-        <!-- Step 1: Destination -->
-        <div class="flex items-center gap-2 mb-2">
-          <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-[#ff2d55] to-[#ff7a45] text-white text-[11px] font-black flex items-center justify-center">1</span>
-          <h2 class="font-display font-bold text-[15px]" data-i18n="step1Title">Destination de l'arrêt</h2>
-          <span class="ms-auto text-[11px] text-dim font-semibold hidden sm:block" data-i18n="tapMapTip">Touchez la carte 📍</span>
+    <div class="sheet-scroll px-4 md:px-5 pb-4" style="max-height:calc(85vh - 50px)">
+      <!-- SECTION 1 : CONFIG -->
+      <div id="viewSetup">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-[#ff2d55] to-orange-500 text-white text-[12px] font-black flex items-center justify-center">1</span>
+            <h2 id="step1Title" class="font-bold text-[15px]">وجهة الوصول (المحطة / المكان)</h2>
+          </div>
+          <span id="clickMapHint" class="text-[11px] text-dim font-medium">انقر على الخريطة 📍</span>
         </div>
 
-        <!-- No Destination Placeholder -->
-        <div id="noDestCard" class="rounded-2xl border-2 border-dashed p-4 text-center transition" style="border-color:var(--border);background:var(--chip);">
-          <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-br from-[#ff2d55]/20 to-purple-500/20 flex items-center justify-center mb-2 border" style="border-color:var(--border)">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff2d55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
+        <div id="cardNoDest" class="rounded-2xl border-2 border-dashed p-4 text-center mb-3" style="border-color:var(--border);background:var(--chip)">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-[#ff2d55]/15 flex items-center justify-center mb-2 border border-[#ff2d55]/30">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff2d55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
-          <p class="text-[13px] font-bold" data-i18n="tapMapPrompt">Touchez la carte Google Maps pour poser l'épingle</p>
-          <p class="text-[11px] text-dim mt-0.5" data-i18n="tapMapSub">ou recherchez et utilisez vos favoris ci-dessous</p>
-          <div class="flex gap-2 justify-center mt-3 flex-wrap">
-            <button id="demoDestBtn" class="text-[11.5px] font-bold px-3 py-1.5 rounded-xl chip btn-tilt">✨ <span data-i18n="demoStation">Exemple : Gare Centrale</span></button>
-          </div>
+          <p id="noDestTxt1" class="text-[13px] font-bold">المس أي مكان على خريطة جوجل لتحديده</p>
+          <p id="noDestTxt2" class="text-[11px] text-dim mt-0.5">أو اختر من قائمة الأماكن المفضلة بالأسفل</p>
         </div>
 
-        <!-- Destination Active Card -->
-        <div id="destCard" class="hidden rounded-2xl p-3.5 border border-[#ff2d55]/40 bg-gradient-to-br from-[#ff2d55]/10 to-purple-500/10">
+        <div id="cardDestSelected" class="hidden rounded-2xl p-3.5 mb-3 border border-[#ff2d55]/40 bg-gradient-to-br from-[#ff2d55]/10 to-indigo-500/10">
           <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff2d55] to-[#ff7a45] flex items-center justify-center shrink-0 shadow-alertGlow text-white">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>
-              </svg>
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff2d55] to-orange-500 flex items-center justify-center shrink-0 shadow-alertGlow text-white">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
             </div>
             <div class="flex-1 min-w-0">
-              <div id="destName" class="text-[14px] font-bold leading-tight truncate">Destination</div>
-              <div id="destCoords" class="text-[10.5px] text-dim font-mono mt-0.5">—</div>
-              <div id="destDirectDist" class="text-[11.5px] font-bold text-cyan-400 mt-1">—</div>
+              <div id="labelDestName" class="text-[14px] font-bold truncate">وجهة الوصول المحددة</div>
+              <div id="labelDestCoords" class="text-[10.5px] text-dim font-mono mt-0.5">—</div>
+              <div id="labelDestDistance" class="text-[12px] font-bold text-cyan-400 mt-1">—</div>
             </div>
-            <button id="clearDestBtn" class="w-7 h-7 rounded-lg chip flex items-center justify-center text-[12px] shrink-0 btn-tilt" title="Effacer">✕</button>
+            <button id="btnRemoveDest" class="w-8 h-8 rounded-lg chip flex items-center justify-center text-[12px] font-bold shrink-0 btn-tilt" title="حذف">✕</button>
           </div>
-
-          <div class="grid grid-cols-2 gap-2 mt-3">
-            <button id="saveFavBtn" class="text-[12px] font-bold py-2 rounded-xl chip flex items-center justify-center gap-1.5 hover:bg-amber-500/20 transition text-amber-300 border-amber-400/40">
-              <span>⭐</span><span id="saveFavTxt" data-i18n="addToFavs">Ajouter aux favoris</span>
+          <div class="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-white/10">
+            <button id="btnOpenSaveFav" class="text-[12px] font-bold py-2 rounded-xl chip flex items-center justify-center gap-1.5 text-amber-300 border-amber-400/40 hover:bg-amber-400/15 transition">
+              <span>⭐</span><span id="txtSaveFavBtn">إضافة إلى المفضلة</span>
             </button>
-            <button id="centerDestBtn" class="text-[12px] font-bold py-2 rounded-xl chip btn-tilt" data-i18n="centerOnMap">Centrer sur la carte</button>
+            <button id="btnRecenterDest" class="text-[12px] font-bold py-2 rounded-xl chip btn-tilt"><span id="txtCenterMapBtn">تركيز على الخريطة</span></button>
           </div>
         </div>
 
-        <!-- Quick Favorites Row -->
-        <div id="favQuickWrap" class="hidden mt-3">
+        <div id="wrapQuickFavs" class="mb-3">
           <div class="flex items-center justify-between mb-1.5">
-            <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-              <span>⭐</span> <span data-i18n="quickFavs">Lieux Favoris</span>
-            </div>
-            <button id="manageFavsBtn" class="text-[10.5px] text-dim font-bold underline hover:opacity-80" data-i18n="manageAll">Gérer</button>
+            <span id="txtQuickFavsTitle" class="text-[11.5px] font-bold text-amber-400 flex items-center gap-1">⭐ الأماكن المفضلة المسجلة</span>
+            <button id="btnManageAllFavs" class="text-[11px] text-dim underline font-bold hover:text-white">إدارة القائمة</button>
           </div>
-          <div id="favQuickList" class="flex gap-2 overflow-x-auto pb-1"></div>
+          <div id="listQuickFavs" class="flex gap-2 overflow-x-auto pb-1.5"></div>
         </div>
 
-        <!-- Step 2: Radius -->
-        <div class="flex items-center gap-2 mt-4 mb-2">
-          <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 text-white text-[11px] font-black flex items-center justify-center">2</span>
-          <h2 class="font-display font-bold text-[15px]" data-i18n="step2Title">Rayon d'alerte</h2>
-          <span id="radiusBig" class="ms-auto font-display font-bold text-[15px] text-cyan-400">500 m</span>
+        <div class="flex items-center justify-between mb-2 mt-4">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 text-white text-[12px] font-black flex items-center justify-center">2</span>
+            <h2 id="step2Title" class="font-bold text-[15px]">مسافة التنبيه المسبق</h2>
+          </div>
+          <span id="displayRadiusValue" class="font-bold text-[14px] text-cyan-400 font-mono">500 m</span>
         </div>
-
-        <div class="rounded-2xl p-3.5" style="background:var(--chip);border:1px solid var(--border)">
+        <div class="rounded-2xl p-3.5 mb-3" style="background:var(--chip);border:1px solid var(--border)">
           <div class="grid grid-cols-4 gap-2 mb-3">
-            <button data-radius="200" class="radius-pill chip rounded-xl py-1.5 text-[11.5px] font-bold">200m</button>
-            <button data-radius="500" class="radius-pill chip rounded-xl py-1.5 text-[11.5px] font-bold active">500m</button>
-            <button data-radius="1000" class="radius-pill chip rounded-xl py-1.5 text-[11.5px] font-bold">1km</button>
-            <button data-radius="2000" class="radius-pill chip rounded-xl py-1.5 text-[11.5px] font-bold">2km</button>
+            <button data-rad="200" class="radius-btn chip rounded-xl py-1.5 text-[12px] font-bold">200m</button>
+            <button data-rad="500" class="radius-btn chip rounded-xl py-1.5 text-[12px] font-bold active">500m</button>
+            <button data-rad="1000" class="radius-btn chip rounded-xl py-1.5 text-[12px] font-bold">1km</button>
+            <button data-rad="2000" class="radius-btn chip rounded-xl py-1.5 text-[12px] font-bold">2km</button>
           </div>
-          <input id="radiusSlider" type="range" min="100" max="5000" step="50" value="500" aria-label="Rayon d'alerte">
-          <div class="flex justify-between text-[10px] text-dim font-bold mt-1">
-            <span data-i18n="radiusMin">100m (Bus/Tram)</span>
-            <span data-i18n="radiusMax">5km (Train/TGV)</span>
+          <input id="sliderRadius" type="range" min="100" max="5000" step="50" value="500" aria-label="Rayon alarme" />
+          <div class="flex justify-between text-[10px] text-dim font-bold mt-1.5">
+            <span id="txtRadBus">100م (حافلة / ترام)</span>
+            <span id="txtRadTrain">5 كم (قطار سريع)</span>
           </div>
-          <p class="text-[11px] text-dim mt-2 leading-relaxed">
-            🔔 <span data-i18n="radiusDesc">L'alarme sonnera automatiquement</span> <b id="radiusExplain" style="color:var(--text)">500 m avant votre arrêt</b>.
-          </p>
+          <p id="txtRadExplanation" class="text-[11.5px] text-dim mt-2 leading-relaxed">🔔 سيرن المنبه عندما تصبح على مسافة <strong class="text-white" id="radExplMeters">500 متر</strong> من وجهتك.</p>
         </div>
 
-        <!-- Step 3: Alarm Options -->
-        <div class="flex items-center gap-2 mt-4 mb-2">
-          <span class="w-6 h-6 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[11px] font-black flex items-center justify-center">3</span>
-          <h2 class="font-display font-bold text-[15px]" data-i18n="step3Title">Alarme & Options</h2>
-        </div>
-
-        <div class="grid grid-cols-3 gap-2 mb-2">
-          <button data-alarm="siren" class="alarm-type active rounded-2xl p-2 text-center border chip">
-            <div class="text-[18px]">🚨</div>
-            <div class="text-[11px] font-bold mt-0.5" data-i18n="siren">Sirène</div>
-            <div class="text-[9px] text-dim" data-i18n="sirenSub">Puissante</div>
-          </button>
-          <button data-alarm="urgent" class="alarm-type rounded-2xl p-2 text-center border chip">
-            <div class="text-[18px]">⏰</div>
-            <div class="text-[11px] font-bold mt-0.5" data-i18n="urgent">Urgent</div>
-            <div class="text-[9px] text-dim" data-i18n="urgentSub">Bips ×3</div>
-          </button>
-          <button data-alarm="soft" class="alarm-type rounded-2xl p-2 text-center border chip">
-            <div class="text-[18px]">🔔</div>
-            <div class="text-[11px] font-bold mt-0.5" data-i18n="soft">Douce</div>
-            <div class="text-[9px] text-dim" data-i18n="softSub">Carillon</div>
-          </button>
-        </div>
-
-        <div class="flex gap-2">
-          <button id="testSoundBtn" class="flex-1 rounded-xl py-2 text-[11.5px] font-bold chip flex items-center justify-center gap-2 btn-tilt">
-            <span id="testSoundIcon">▶</span>
-            <span data-i18n="testSound">Tester le son</span>
-            <span id="testEQ" class="eq hidden"><span></span><span></span><span></span></span>
-          </button>
-          <div class="flex-1 rounded-xl px-3 py-2 chip flex items-center justify-between">
-            <span class="text-[11.5px] font-bold" data-i18n="vibration">📳 Vibreur</span>
-            <div id="vibToggle" class="toggle on" role="switch" aria-checked="true"></div>
-          </div>
-        </div>
-
-        <!-- Start Tracking Button -->
-        <button id="startBtn" disabled class="btn-primary w-full mt-4 rounded-2xl py-3.5 font-display font-bold text-[15px] flex items-center justify-center gap-2 btn-tilt">
+        <button id="btnStartTrip" disabled class="btn-primary w-full rounded-2xl py-4 font-bold text-[16px] flex items-center justify-center gap-2 transition btn-tilt">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          <span data-i18n="startTracking">Démarrer le réveil GPS</span>
+          <span id="txtStartBtn">بدء تتبع الرحلة والتنبيه</span>
         </button>
-        <p id="startHint" class="text-center text-[11px] text-dim mt-2 font-semibold" data-i18n="startHint">Définissez une destination sur la carte pour démarrer</p>
+        <p id="txtStartDisabledHint" class="text-center text-[11px] text-dim mt-2 font-medium">حدد وجهة على الخريطة لتشغيل التتبع</p>
 
+        <!-- ENCART PUB -->
+        <div class="mt-5 rounded-2xl overflow-hidden p-3 ad-banner-box">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[8px] font-black tracking-widest px-1.5 py-0.5 rounded bg-amber-400 text-black uppercase" id="badgeSponsored">إعلان ممول</span>
+              <span class="text-[9.5px] text-dim" id="txtAdPartner">شريك معتمد</span>
+            </div>
+            <span class="text-[10px] text-dim font-mono">AD</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <img id="adBannerImage" class="w-12 h-12 rounded-xl object-cover shrink-0" src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=200&q=75" alt="Offer" />
+            <div class="flex-1 min-w-0">
+              <div id="adBannerTitle" class="font-bold text-[12.5px] leading-tight truncate">عروض تذاكر القطارات والحافلات</div>
+              <div id="adBannerSubtitle" class="text-[11px] text-dim mt-0.5 truncate">وفر حتى 35% على رحلاتك اليومية والسفر</div>
+            </div>
+            <button id="adBannerAction" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-black font-bold text-[11.5px] shrink-0 btn-tilt"><span id="txtAdDiscover">عرض</span></button>
+          </div>
+        </div>
       </div>
 
-      <!-- ==================== VIEW 2: ACTIVE TRACKING PANEL ==================== -->
-      <div id="panelTracking" class="hidden">
-        <div class="flex items-center gap-2 mb-3">
-          <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/15 border border-green-500/40">
+      <!-- SECTION 2 : TRACKING -->
+      <div id="viewTracking" class="hidden">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/40">
             <span class="live-dot"></span>
-            <span class="text-[10px] font-black tracking-widest text-green-400 uppercase" data-i18n="trackingActive">SUIVI GPS ACTIF</span>
+            <span id="txtLiveStatus" class="text-[11px] font-black tracking-widest text-green-400">تتبع GPS نشط</span>
           </div>
-          <div class="ms-auto text-end">
-            <div id="elapsedTime" class="font-mono font-bold text-[13px]">00:00</div>
-            <div id="trackAccuracy" class="text-[9.5px] text-dim font-bold">GPS ±—</div>
+          <div class="text-right font-mono font-bold text-[14px]" id="trackTimer">00:00</div>
+        </div>
+        <div class="rounded-3xl p-5 text-center relative overflow-hidden border border-indigo-500/30" style="background:radial-gradient(circle at 50% 20%, rgba(99,102,241,0.25), transparent 70%), var(--chip)">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-dim" id="txtRemainingDistTitle">المسافة المتبقية حتى وجهتك</div>
+          <div id="liveRemainingDistance" class="font-display font-black text-[46px] leading-none my-2 text-white tracking-tight">—</div>
+          <div id="liveRemainingSub" class="text-[12.5px] text-cyan-400 font-semibold">جاري حساب المسافة...</div>
+          <div class="mt-4 h-2.5 rounded-full overflow-hidden bg-black/30 border border-white/10">
+            <div id="barTrackProgress" class="h-full rounded-full transition-all duration-300" style="width:0%;background:linear-gradient(90deg,#6366f1,#22d3ee,#10b981)"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-dim font-bold mt-1.5">
+            <span id="txtStartPoint">نقطة الانطلاق</span>
+            <span id="txtProgressPercent">0%</span>
+            <span id="txtAlertThreshold">التنبيه عند 500م</span>
           </div>
         </div>
-
-        <!-- Main Tracking Distance Display -->
-        <div class="rounded-3xl p-5 text-center relative overflow-hidden border border-indigo-500/30" style="background:radial-gradient(120% 120% at 50% 0%, rgba(99,102,241,0.22), transparent 70%), var(--chip);">
-          <div class="text-[10px] font-bold tracking-widest uppercase text-dim" data-i18n="remainingDistance">Distance restante</div>
-          <div id="liveDistance" class="font-display font-black text-[44px] leading-tight my-1 tracking-tight">—</div>
-          <div id="liveSub" class="text-[12px] text-dim font-semibold" data-i18n="calculating">Calcul en cours…</div>
-          <div class="mt-3.5 h-2 rounded-full overflow-hidden bg-black/30 border border-white/10">
-            <div id="trackingProgress" class="h-full rounded-full transition-all duration-500" style="width:0%;background:linear-gradient(90deg,#6366f1,#22d3ee)"></div>
+        <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+          <div class="rounded-2xl p-2.5 chip">
+            <div id="metricSpeed" class="font-bold text-[16px] text-white">0</div>
+            <div id="txtSpeedUnit" class="text-[9.5px] text-dim uppercase font-bold">كم / ساعة</div>
+          </div>
+          <div class="rounded-2xl p-2.5 chip">
+            <div id="metricHeading" class="font-bold text-[16px] text-white">—</div>
+            <div id="txtHeadingUnit" class="text-[9.5px] text-dim uppercase font-bold">الاتجاه</div>
+          </div>
+          <div class="rounded-2xl p-2.5 chip">
+            <div id="metricEta" class="font-bold text-[16px] text-white">—</div>
+            <div id="txtEtaUnit" class="text-[9.5px] text-dim uppercase font-bold">وقت الوصول</div>
           </div>
         </div>
-
-        <div class="flex justify-between mt-1.5 text-[9.5px] font-bold text-dim">
-          <span data-i18n="start">DÉPART</span>
-          <span id="progressPct">0%</span>
-          <span id="progressTarget">ALERTE À 500M</span>
+        <div class="mt-3 rounded-2xl p-2.5 ad-banner-box flex items-center justify-between">
+          <div class="flex items-center gap-2 min-w-0 pr-2">
+            <span class="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-400 text-black">AD</span>
+            <span id="txtTrackAdHint" class="text-[11px] text-dim truncate">عروض راحة السفر وسماعات حجب الضجيج</span>
+          </div>
+          <button id="btnTrackAdClick" class="text-[11px] font-bold text-amber-300 underline shrink-0">معرفة المزيد</button>
         </div>
-
-        <div id="insideBadge" class="hidden mt-2 px-3 py-1.5 rounded-full bg-[#ff2d55] text-white text-[11px] font-black animate-pulse text-center" data-i18n="inAlertZone">
-          📍 DANS LA ZONE D'ALERTE !
+        <div class="flex gap-2 mt-4">
+          <button id="btnMuteSound" class="flex-1 rounded-2xl py-3.5 text-[12.5px] font-bold chip btn-tilt"><span id="txtMuteBtn">🔕 كتم الصوت</span></button>
+          <button id="btnStopTrip" class="flex-[2] rounded-2xl py-3.5 font-bold text-[13.5px] text-white bg-gradient-to-r from-[#ff2d55] to-orange-500 shadow-alertGlow transition btn-tilt"><span id="txtStopTripBtn">إنهاء التتبع</span></button>
         </div>
-
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-4 gap-2 mt-3">
-          <div class="rounded-2xl p-2 text-center chip">
-            <div id="statSpeed" class="font-display font-bold text-[14px]">0</div>
-            <div class="text-[8.5px] text-dim font-bold uppercase" data-i18n="kmh">km/h</div>
-          </div>
-          <div class="rounded-2xl p-2 text-center chip">
-            <div id="statCap" class="font-display font-bold text-[14px]">—</div>
-            <div class="text-[8.5px] text-dim font-bold uppercase" data-i18n="bearing">Cap</div>
-          </div>
-          <div class="rounded-2xl p-2 text-center chip">
-            <div id="statEta" class="font-display font-bold text-[14px]">—</div>
-            <div class="text-[8.5px] text-dim font-bold uppercase" data-i18n="eta">ETA</div>
-          </div>
-          <div class="rounded-2xl p-2 text-center chip">
-            <div id="statRadius" class="font-display font-bold text-[14px]">500m</div>
-            <div class="text-[8.5px] text-dim font-bold uppercase" data-i18n="radius">Rayon</div>
-          </div>
-        </div>
-
-        <!-- Live radius adjustment -->
-        <div class="rounded-2xl p-3 mt-2 flex items-center gap-3 chip">
-          <div class="w-9 h-9 rounded-full chip flex items-center justify-center shrink-0">
-            <svg id="panelArrow" width="20" height="20" viewBox="0 0 24 24" fill="#22d3ee" style="transition:transform .5s ease;">
-              <path d="M12 2 19 21l-7-4-7 4z"/>
-            </svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div id="headingText" class="text-[11.5px] font-bold truncate" data-i18n="heading">Direction : —</div>
-            <input id="radiusSliderLive" type="range" min="100" max="5000" step="50" value="500" class="mt-1">
-          </div>
-        </div>
-
-        <div class="flex gap-2 mt-3">
-          <button id="muteBtn" class="flex-1 rounded-2xl py-3 text-[12px] font-bold chip btn-tilt" data-i18n="muteSound">🔕 Couper son</button>
-          <button id="stopBtn" class="flex-[2] rounded-2xl py-3 font-display font-bold text-[13.5px] text-white bg-gradient-to-r from-[#ff2d55] to-[#ff6b4a] shadow-alertGlow transition flex items-center justify-center gap-1.5 btn-tilt">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-            <span data-i18n="stopTracking">Arrêter le suivi</span>
-          </button>
-        </div>
-
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- ===== SMART AD BANNER (SPONSORED) ===== -->
-<div id="bannerAd">
-  <div class="glass-strong rounded-2xl overflow-hidden border border-white/15 shadow-2xl">
-    <div class="flex items-center justify-between px-3 py-1.5 border-b border-white/10 bg-white/[.04]">
-      <div class="flex items-center gap-1.5">
-        <span class="text-[8px] font-black tracking-wider px-1.5 py-0.5 rounded bg-amber-400 text-black uppercase" data-i18n="sponsored">Sponsorisé</span>
-        <span class="text-[9px] font-mono text-dim" data-i18n="adLabel">Publicité</span>
-      </div>
-      <button id="bannerClose" class="w-5 h-5 rounded bg-white/10 flex items-center justify-center text-[10px] font-bold hover:bg-white/20">✕</button>
-    </div>
-    <div class="flex items-center gap-3 p-2.5">
-      <div class="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-indigo-900">
-        <img id="bannerImg" class="w-full h-full object-cover" alt="" src="https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=200&q=70">
-      </div>
-      <div class="flex-1 min-w-0">
-        <div id="bannerTitle" class="text-[12.5px] font-bold leading-tight truncate">Voyagez sereinement</div>
-        <div id="bannerBody" class="text-[10.5px] text-dim truncate">Billets et offres partenaires disponibles</div>
-      </div>
-      <button id="bannerCta" class="shrink-0 px-3 py-1.5 rounded-xl text-[11.5px] font-bold text-white shadow-lg btn-tilt" style="background:linear-gradient(135deg,#6366f1,#d946ef)" data-i18n="viewAd">Voir</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== FULLSCREEN ARRIVAL ALARM OVERLAY ===== -->
-<div id="alarmOverlay" class="fixed inset-0 z-[2000] items-center justify-center p-4">
+<!-- ÉCRAN D'ALARME -->
+<div id="alarmOverlay" class="fixed inset-0 z-[2000] items-center justify-center p-5">
   <div class="alarm-bg"></div>
   <div class="relative w-full max-w-md text-center text-white">
-    
-    <div class="alarm-shake inline-flex w-22 h-22 rounded-full bg-white items-center justify-center shadow-2xl mb-3 p-4">
-      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
-      </svg>
+    <div class="alarm-ring inline-flex w-24 h-24 rounded-full bg-white items-center justify-center shadow-2xl mb-3 text-red-600">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
     </div>
-
-    <div class="inline-block px-3.5 py-1 rounded-full bg-white/20 border border-white/40 text-[10px] font-black tracking-widest mb-2 backdrop-blur uppercase" data-i18n="alarmHeader">
-      ⚠️ ALERTE ARRIVÉE IMMINENTE ⚠️
-    </div>
-
-    <h1 class="font-display font-black text-[32px] sm:text-[38px] leading-tight drop-shadow-2xl" data-i18n="alarmTitle">
-      Vous arrivez à destination !
-    </h1>
-
+    <div class="inline-block px-4 py-1 rounded-full bg-white/20 border border-white/40 text-[11px] font-black tracking-widest mb-2 backdrop-blur">⚠️ <span id="txtAlarmTag">تنبيه الاقتراب من وجهتك</span> ⚠️</div>
+    <h1 id="txtAlarmMainTitle" class="font-bold text-[32px] sm:text-[38px] leading-tight drop-shadow-xl">استيقظ ! لقد وصلت إلى محطتك</h1>
     <div class="mt-3 inline-flex items-center gap-3 bg-black/40 backdrop-blur-xl rounded-2xl px-6 py-2.5 border border-white/30">
       <div>
-        <div id="alarmDistance" class="font-display font-black text-[28px] leading-none">0 m</div>
-        <div class="text-[9.5px] font-bold opacity-80 tracking-widest mt-0.5" data-i18n="remainingDistance">DISTANCE RESTANTE</div>
+        <div id="alarmDistanceDisplay" class="font-display font-black text-[32px] leading-none">0 m</div>
+        <div id="txtAlarmDistSub" class="text-[10px] font-bold opacity-80 tracking-wider mt-1">المسافة المتبقية الحالية</div>
       </div>
     </div>
-
-    <p id="alarmDest" class="mt-2.5 text-[13px] font-semibold opacity-90 truncate px-4">—</p>
-
-    <div class="flex items-center justify-center gap-2 mt-2 text-[11.5px] font-bold opacity-90">
-      <span class="eq"><span style="background:#fff"></span><span style="background:#fff"></span><span style="background:#fff"></span></span>
-      <span data-i18n="alarmActiveMsg">Alarme sonore + vibration actives</span>
+    <p id="alarmTargetNameDisplay" class="mt-2 text-[14px] font-bold opacity-90 truncate px-4">—</p>
+    <div class="grid gap-2.5 mt-5">
+      <button id="btnAlarmTurnOff" class="rounded-2xl py-4 font-bold text-[16px] bg-white text-red-700 shadow-2xl transition btn-tilt"><span id="txtAlarmOffBtn">■ إيقاف التنبيه وإنهاء الرحلة</span></button>
+      <button id="btnAlarmMuteOnly" class="rounded-2xl py-3 font-bold text-[13px] bg-white/20 border border-white/40 backdrop-blur transition btn-tilt"><span id="txtAlarmMuteOnlyBtn">كتم الصوت ومواصلة التتبع حتى التوقف</span></button>
     </div>
-
-    <div class="grid gap-2 mt-5">
-      <button id="alarmStopAll" class="rounded-2xl py-3.5 font-display font-bold text-[15px] bg-white text-rose-700 shadow-2xl transition btn-tilt" data-i18n="alarmDismiss">
-        ■ Arrêter l'alarme et le suivi
-      </button>
-      <button id="alarmContinue" class="rounded-2xl py-3 font-bold text-[13px] bg-white/15 border border-white/50 backdrop-blur transition btn-tilt" data-i18n="alarmMuteOnly">
-        Couper le son & continuer jusqu'à l'arrêt
-      </button>
-    </div>
-
-    <p class="mt-3 text-[10.5px] opacity-75 font-semibold" data-i18n="prepareToLeave">Préparez-vous à descendre • Vérifiez vos affaires</p>
-  </div>
-</div>
-
-<!-- ===== NAMED FAVORITES MODAL ===== -->
-<div id="favModal" class="hidden fixed inset-0 z-[1900] items-center justify-center p-3 md:p-6 bg-black/75 backdrop-blur-md">
-  <div class="w-full max-w-md rounded-3xl overflow-hidden flex flex-col border border-white/15 shadow-2xl glass-strong" style="max-height:85vh">
-    
-    <!-- Header -->
-    <div class="flex items-center justify-between px-5 py-3.5 border-b border-white/10 bg-white/[.03]">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center text-[16px]">⭐</div>
-        <div>
-          <div class="font-display font-bold text-[15px]" data-i18n="favModalTitle">Lieux Favoris</div>
-          <div class="text-[10.5px] text-dim" data-i18n="favModalSub">Enregistrez vos arrêts quotidiens avec un nom</div>
-        </div>
-      </div>
-      <button id="favCloseBtn" class="w-7 h-7 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 text-[12px] font-bold">✕</button>
-    </div>
-
-    <!-- Add Form -->
-    <div class="p-4 border-b border-white/10 bg-black/20">
-      <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2" data-i18n="addFavHeading">Nommer le lieu actuel</div>
-      <div class="flex gap-2">
-        <input id="favCustomName" type="text" placeholder="Ex: Maison, Travail, Gare Centrale…" class="chip rounded-xl px-3 py-2 text-[13px] font-medium flex-1 outline-none focus:border-amber-400">
-        <button id="favSaveConfirmBtn" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-black text-[12px] font-black btn-tilt shadow-goldGlow" data-i18n="saveBtn">Enregistrer</button>
-      </div>
-      
-      <!-- Quick name presets -->
-      <div class="flex gap-1.5 mt-2.5 flex-wrap">
-        <button class="name-sugg chip rounded-full px-2.5 py-1 text-[10px] font-bold text-amber-300 border-amber-400/30" data-name="🏠 Maison">🏠 <span data-i18n="suggHome">Maison</span></button>
-        <button class="name-sugg chip rounded-full px-2.5 py-1 text-[10px] font-bold text-amber-300 border-amber-400/30" data-name="💼 Travail">💼 <span data-i18n="suggWork">Travail</span></button>
-        <button class="name-sugg chip rounded-full px-2.5 py-1 text-[10px] font-bold text-amber-300 border-amber-400/30" data-name="🚉 Gare">🚉 <span data-i18n="suggStation">Gare</span></button>
-        <button class="name-sugg chip rounded-full px-2.5 py-1 text-[10px] font-bold text-amber-300 border-amber-400/30" data-name="🎓 Université">🎓 <span data-i18n="suggUniv">Université</span></button>
-      </div>
-    </div>
-
-    <!-- Favorites List -->
-    <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-2" id="favListContainer"></div>
-
-    <div class="p-3 border-t border-white/10 text-center text-[10.5px] text-dim" data-i18n="favSelectHint">
-      💡 Touchez un favori pour le définir immédiatement comme destination.
-    </div>
-
-  </div>
-</div>
-
-<!-- ===== SPONSORED INTERSTITIAL MODAL ===== -->
-<div id="adOverlay" class="hidden fixed inset-0 z-[2100] items-center justify-center p-4">
-  <div class="absolute inset-0 bg-black/90 backdrop-blur-md"></div>
-  <div class="relative w-full max-w-[390px] rounded-3xl overflow-hidden border border-white/15 shadow-2xl bg-[#0b1126]">
-    <div class="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/[.03]">
-      <div class="flex items-center gap-2">
-        <span class="text-[8.5px] font-black tracking-wider px-1.5 py-0.5 rounded bg-amber-400 text-black uppercase" data-i18n="sponsored">Sponsorisé</span>
-        <span class="text-[9.5px] font-mono text-slate-400" data-i18n="adLabel">Publicité</span>
-      </div>
-      <button id="adSkipBtn" disabled class="text-[11px] font-bold px-3 py-1 rounded-lg bg-white/10 text-slate-300 disabled:opacity-60 transition">
-        5s
-      </button>
-    </div>
-
-    <div id="adCreative">
-      <div class="h-[180px] relative overflow-hidden bg-indigo-950">
-        <img id="adImg" class="w-full h-full object-cover" alt="" src="https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=800&q=80">
-        <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0b1126] to-transparent"></div>
-        <div class="absolute bottom-2 end-3 text-[10px] font-bold text-white/90" id="adBrand">Partenaire</div>
-      </div>
-      <div class="p-4 text-white">
-        <div id="adTitle" class="font-display font-bold text-[17px] leading-tight">Voyages et transports partenaires</div>
-        <div id="adBody" class="text-slate-400 text-[12px] mt-1 leading-relaxed">Profitez de réductions exclusives lors de vos correspondances.</div>
-        <button id="adCta" class="w-full mt-4 rounded-2xl py-2.5 font-bold text-[13px] bg-gradient-to-r from-amber-400 to-orange-500 text-black transition btn-tilt" data-i18n="discoverOffer">Découvrir l'offre</button>
-      </div>
-    </div>
-    
-    <div class="h-1 bg-white/10">
-      <div id="adProgress" class="h-full w-0 transition-all duration-100 bg-amber-400"></div>
+    <div class="mt-4 p-2.5 rounded-xl bg-black/30 border border-white/10 text-[11px] flex items-center justify-between text-slate-200">
+      <span class="flex items-center gap-1.5">
+        <span class="bg-amber-400 text-black px-1.5 py-0.5 rounded text-[8px] font-black">AD</span>
+        <span id="txtAlarmAdSponsor">احجز تاكسي أو وسيلة تنقلك التالية الآن بخصم خاص</span>
+      </span>
     </div>
   </div>
 </div>
 
-<!-- ===== TOAST ALERTS ===== -->
-<div id="toasts" class="fixed top-[180px] md:top-4 start-4 end-4 md:start-auto md:end-4 md:w-[320px] z-[1600] flex flex-col gap-2 pointer-events-none"></div>
+<!-- TOASTS -->
+<div id="toastContainer" class="fixed top-[200px] md:top-5 left-4 right-4 md:left-auto md:right-5 md:w-[320px] z-[1600] flex flex-col gap-2 items-stretch pointer-events-none"></div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
   'use strict';
 
-  var $ = function (id) { return document.getElementById(id); };
-
-  /* =========================================================================
-     1. MULTILINGUAL DICTIONARY (AR / FR / EN) + RTL SUPPORT
-     ========================================================================= */
   var I18N = {
     ar: {
-      appSubtitle: "خرائط Google • منبه الوصول GPS",
-      favsBtn: "المفضلة",
-      locatingGps: "جاري تحديد موقعك…",
-      gpsAcquired: "تم التقاط إشارة GPS 🛰️",
-      destination: "الوجهة",
-      step1Title: "محطة الوجهة",
-      tapMapTip: "المس الخريطة 📍",
-      tapMapPrompt: "المس خريطة Google Maps لتحديد مكان النزول",
-      tapMapSub: "أو ابحث عن المحطة واستخدم المفضلة أدناه",
-      demoStation: "مثال: المحطة المركزية",
-      addToFavs: "حفظ في المفضلة",
-      favSaved: "تم الحفظ في المفضلة ⭐",
-      centerOnMap: "توسيط الخريطة",
-      quickFavs: "الأماكن المفضلة",
-      manageAll: "إدارة",
-      step2Title: "نطاق التنبيه المسبق",
-      radiusMin: "100م (حافلة/ترام)",
-      radiusMax: "5كم (قطار سريع)",
-      radiusDesc: "سيرن المنبه تلقائياً قبل الوصول بمسافة",
-      step3Title: "نغمة المنبه والخيارات",
-      siren: "صفارة إنذار",
-      sirenSub: "قوية جداً",
-      urgent: "عاجل",
-      urgentSub: "رنات سريعة",
-      soft: "هادئ",
-      softSub: "جرس لطيف",
-      testSound: "تجربة الصوت",
-      vibration: "📳 هزاز",
-      startTracking: "بدء التنبيه ومتابعة المسار",
-      startHint: "حدد وجهتك على الخريطة لتفعيل المنبه",
-      trackingActive: "تتبع GPS قيد التشغيل",
-      remainingDistance: "المسافة المتبقية",
-      calculating: "جاري الحساب…",
-      start: "الانطلاق",
-      inAlertZone: "📍 لقد دخلت نطاق التنبيه!",
-      kmh: "كم/س",
-      bearing: "الاتجاه",
-      eta: "الوقت المقدر",
-      radius: "النطاق",
-      heading: "الاتجاه نحو المحطة",
-      muteSound: "🔕 كتم الصوت",
-      unmuteSound: "🔔 تشغيل الصوت",
-      stopTracking: "إيقاف التتبع",
-      sponsored: "إعلان مدعوم",
-      adLabel: "إعلان",
-      viewAd: "عرض",
-      alarmHeader: "⚠️ تنبيه اقتراب الوصول ⚠️",
-      alarmTitle: "لقد وصلت إلى وجهتك!",
-      alarmActiveMsg: "صوت المنبه والاهتزاز يعملان الآن",
-      alarmDismiss: "■ إيقاف المنبه والتتبع",
-      alarmMuteOnly: "كتم الصوت والاستمرار حتى التوقف",
-      prepareToLeave: "استعد للنزول • تفقد أغراضك الشخصية",
-      favModalTitle: "الأماكن المفضلة",
-      favModalSub: "احفظ محطاتك اليومية للوصول السريع إليها",
-      addFavHeading: "تسمية المكان الحالي",
-      saveBtn: "حفظ",
-      suggHome: "المنزل",
-      suggWork: "العمل",
-      suggStation: "المحطة",
-      suggUniv: "الجامعة",
-      favSelectHint: "💡 اضغط على أي مكان مفضل لتعيينه كوجهة فوراً.",
-      discoverOffer: "استكشاف العرض",
-      mapType: "نوع الخريطة",
-      remaining: "متبقي",
-      sheetHintOpen: "اسحب لعرض الخيارات",
-      sheetHintClose: "اسحب لعرض الخريطة",
-      noFavs: "لا توجد أماكن مفضلة بعد. احفظ محطاتك الآن!"
+      dir:'rtl', logoTitle:'ARRIVA', subTitle:'خرائط جوجل • منبه GPS الذكي',
+      searchPlaceholder:'ابحث عن محطة، عنوان، موقف أو مكان...',
+      searchingGPS:'جاري البحث عن GPS...', gpsReady:'إشارة GPS دقيقة (±{acc}م)', gpsError:'تعذر تحديد الموقع',
+      mapTitle:'نوع الخريطة', sheetHint:'اسحب لتكبير الخريطة',
+      navMenu:'القائمة', secMap:'الخريطة', secFav:'المفضلة', secLang:'اللغة', secSettings:'الإعدادات', secAbout:'حول التطبيق',
+      step1:'وجهة الوصول (المحطة / المكان)', clickMap:'انقر على الخريطة 📍',
+      noDestTitle:'المس أي مكان على خريطة جوجل لتحديده', noDestSub:'أو اختر من قائمة الأماكن المفضلة بالأسفل',
+      destSelected:'وجهة الوصول المحددة', addFav:'إضافة إلى المفضلة', favSaved:'محفوظ في المفضلة ⭐', centerMap:'تركيز على الخريطة',
+      quickFavs:'⭐ الأماكن المفضلة المسجلة', manageFavs:'إدارة القائمة',
+      step2:'مسافة التنبيه المسبق', radBus:'100م (حافلة / ترام)', radTrain:'5 كم (قطار سريع)',
+      radExpl:'🔔 سيرن المنبه عندما تصبح على مسافة {m} من وجهتك.',
+      settingsTone:'نغمة المنبه', siren:'صفارة قوية', urgent:'تنبيه متكرر', soft:'جرس ناعم',
+      testTone:'تجربة النغمة', stopTone:'إيقاف التجربة', vibrate:'📳 الاهتزاز', themeLabel:'🌙 الوضع الليلي',
+      startTrip:'بدء تتبع الرحلة والتنبيه', startTripDisabled:'حدد وجهة على الخريطة لتشغيل التتبع',
+      adSponsored:'إعلان ممول', adPartner:'شريك معتمد', adTitleDefault:'عروض حجز رحلات القطار والباصات', adSubDefault:'وفر حتى 35% على مشاويرك اليومية مع الشركاء', adDiscover:'عرض', adTrackHint:'عروض راحة السفر وسماعات حجب الضجيج',
+      trackStatus:'تتبع GPS نشط', remDistTitle:'المسافة المتبقية حتى وجهتك', calculating:'جاري حساب المسافة...', startPoint:'نقطة الانطلاق', alertAt:'التنبيه عند {m}', speedUnit:'كم / س', headingUnit:'الاتجاه', etaUnit:'الوقت المتبقي',
+      muteSound:'🔕 كتم الصوت', unmuteSound:'🔔 تشغيل الصوت', stopTrip:'إنهاء التتبع',
+      favInputLbl:'حفظ الوجهة الحالية باسم مخصص :', favInputPlaceholder:'مثال: البيت، محطة القطار، العمل، الجامعة...', saveBtn:'حفظ',
+      noFavsYet:'لا توجد أماكن مفضلة مسجلة حتى الآن. أضف أماكنك اليومية لتصلك تنبيهات سريعة!',
+      alarmTag:'تنبيه الاقتراب من وجهتك', alarmMain:'استيقظ ! لقد اقتربت من محطة النزول', alarmDistSub:'المسافة المتبقية الحالية', alarmOff:'■ إيقاف التنبيه وإنهاء الرحلة', alarmMuteOnly:'كتم الصوت ومواصلة التتبع حتى التوقف', alarmAd:'احجز تاكسي أو وسيلة تنقلك التالية الآن بخصم خاص',
+      tagHome:'🏠 المنزل', tagWork:'💼 العمل', tagStation:'🚉 المحطة', tagSchool:'🎓 الجامعة', tagMosque:'🕌 المسجد',
+      aboutDesc:'ARRIVA هو منبه ذكي يعتمد على تحديد المواقع GPS وخرائط جوجل. يوقظك تلقائياً قبل الوصول إلى محطتك أثناء التنقل بالحافلة أو القطار.',
+      apkTitle:'📱 تحويل إلى تطبيق APK', installPwa:'⬇ تثبيت التطبيق (PWA)'
     },
     fr: {
-      appSubtitle: "Google Maps • Réveil GPS",
-      favsBtn: "Favoris",
-      locatingGps: "Localisation GPS…",
-      gpsAcquired: "Signal GPS acquis 🛰️",
-      destination: "Destination",
-      step1Title: "Destination de l'arrêt",
-      tapMapTip: "Touchez la carte 📍",
-      tapMapPrompt: "Touchez la carte Google Maps pour poser l'épingle",
-      tapMapSub: "ou recherchez et utilisez vos favoris ci-dessous",
-      demoStation: "Exemple : Gare Centrale",
-      addToFavs: "Ajouter aux favoris",
-      favSaved: "Favori enregistré ⭐",
-      centerOnMap: "Centrer sur la carte",
-      quickFavs: "Lieux Favoris",
-      manageAll: "Gérer",
-      step2Title: "Rayon d'alerte",
-      radiusMin: "100m (Bus/Tram)",
-      radiusMax: "5km (Train/TGV)",
-      radiusDesc: "L'alarme sonnera automatiquement",
-      step3Title: "Alarme & Options",
-      siren: "Sirène",
-      sirenSub: "Puissante",
-      urgent: "Urgent",
-      urgentSub: "Bips ×3",
-      soft: "Douce",
-      softSub: "Carillon",
-      testSound: "Tester le son",
-      vibration: "📳 Vibreur",
-      startTracking: "Démarrer le réveil GPS",
-      startHint: "Définissez une destination sur la carte pour démarrer",
-      trackingActive: "SUIVI GPS ACTIF",
-      remainingDistance: "Distance restante",
-      calculating: "Calcul en cours…",
-      start: "DÉPART",
-      inAlertZone: "📍 DANS LA ZONE D'ALERTE !",
-      kmh: "km/h",
-      bearing: "Cap",
-      eta: "ETA",
-      radius: "Rayon",
-      heading: "Direction :",
-      muteSound: "🔕 Couper son",
-      unmuteSound: "🔔 Réactiver son",
-      stopTracking: "Arrêter le suivi",
-      sponsored: "Sponsorisé",
-      adLabel: "Publicité",
-      viewAd: "Voir",
-      alarmHeader: "⚠️ ALERTE ARRIVÉE IMMINENTE ⚠️",
-      alarmTitle: "Vous arrivez à destination !",
-      alarmActiveMsg: "Alarme sonore + vibration actives",
-      alarmDismiss: "■ Arrêter l'alarme et le suivi",
-      alarmMuteOnly: "Couper le son & continuer jusqu'à l'arrêt",
-      prepareToLeave: "Préparez-vous à descendre • Vérifiez vos affaires",
-      favModalTitle: "Lieux Favoris",
-      favModalSub: "Enregistrez vos arrêts quotidiens avec un nom",
-      addFavHeading: "Nommer le lieu actuel",
-      saveBtn: "Enregistrer",
-      suggHome: "Maison",
-      suggWork: "Travail",
-      suggStation: "Gare",
-      suggUniv: "Université",
-      favSelectHint: "💡 Touchez un favori pour le définir immédiatement comme destination.",
-      discoverOffer: "Découvrir l'offre",
-      mapType: "Fonds de carte",
-      remaining: "restants",
-      sheetHintOpen: "Glisser pour afficher",
-      sheetHintClose: "Glisser pour voir la carte",
-      noFavs: "Aucun favori pour l'instant. Enregistrez vos arrêts !"
+      dir:'ltr', logoTitle:'ARRIVA', subTitle:'Google Maps • Réveil GPS',
+      searchPlaceholder:'Rechercher gare, arrêt, métro, adresse...',
+      searchingGPS:'Recherche GPS...', gpsReady:'GPS précis (±{acc}m)', gpsError:'GPS non disponible',
+      mapTitle:'Fond de carte', sheetHint:'Glisser pour voir la carte',
+      navMenu:'Menu', secMap:'Carte', secFav:'Favoris', secLang:'Langue', secSettings:'Paramètres', secAbout:'À propos',
+      step1:'Destination (Gare / Arrêt)', clickMap:'Touchez la carte 📍',
+      noDestTitle:'Touchez la carte Google Maps pour poser l’épingle', noDestSub:'ou choisissez un lieu dans vos favoris ci-dessous',
+      destSelected:'Arrêt sélectionné', addFav:'Ajouter aux favoris', favSaved:'Favori enregistré ⭐', centerMap:'Centrer la carte',
+      quickFavs:'⭐ Lieux Favoris', manageFavs:'Gérer tout',
+      step2:'Rayon de réveil avant l’arrêt', radBus:'100m (Bus/Tram)', radTrain:'5 km (Train/TGV)',
+      radExpl:'🔔 L’alarme sonnera dès que vous serez à {m} de l’arrivée.',
+      settingsTone:'Sonnerie d\'alarme', siren:'Sirène forte', urgent:'Bips urgents', soft:'Carillon doux',
+      testTone:'Tester le son', stopTone:'Arrêter le son', vibrate:'📳 Vibration', themeLabel:'🌙 Mode sombre',
+      startTrip:'Démarrer le suivi du trajet', startTripDisabled:'Définissez une destination pour démarrer',
+      adSponsored:'SPONSORISÉ', adPartner:'Offre Partenaire', adTitleDefault:'Billets de train & bus au meilleur prix', adSubDefault:'Économisez jusqu’à 35% sur vos trajets quotidiens', adDiscover:'Voir', adTrackHint:'Offres confort voyage & casques anti-bruit',
+      trackStatus:'SUIVI GPS ACTIF', remDistTitle:'DISTANCE RESTANTE', calculating:'Calcul de la distance...', startPoint:'DÉPART', alertAt:'ALERTE À {m}', speedUnit:'KM/H', headingUnit:'CAP', etaUnit:'TEMPS ESTIMÉ',
+      muteSound:'🔕 Couper son', unmuteSound:'🔔 Réactiver son', stopTrip:'Arrêter le trajet',
+      favInputLbl:'Enregistrer le lieu actuel sous un nom :', favInputPlaceholder:'Ex: Maison, Gare TGV, Travail, Bureau...', saveBtn:'Enregistrer',
+      noFavsYet:'Aucun favori enregistré. Enregistrez vos arrêts réguliers pour gagner du temps !',
+      alarmTag:'ALERTE DE PROXIMITÉ', alarmMain:'Préparez-vous à descendre ! Vous arrivez.', alarmDistSub:'DISTANCE RESTANTE', alarmOff:'■ Arrêter l’alarme et le trajet', alarmMuteOnly:'Couper le son et continuer jusqu’à l’arrêt', alarmAd:'Commandez votre taxi ou VTC à l’arrivée dès maintenant',
+      tagHome:'🏠 Maison', tagWork:'💼 Travail', tagStation:'🚉 Gare', tagSchool:'🎓 École', tagMosque:'📍 Lieu favori',
+      aboutDesc:'ARRIVA est un réveil GPS intelligent basé sur Google Maps. Il vous réveille automatiquement avant d’arriver à votre arrêt de bus ou de train.',
+      apkTitle:'📱 Convertir en application APK', installPwa:'⬇ Installer l\'application (PWA)'
     },
     en: {
-      appSubtitle: "Google Maps • GPS Wake Alarm",
-      favsBtn: "Favorites",
-      locatingGps: "Locating GPS…",
-      gpsAcquired: "GPS Signal Acquired 🛰️",
-      destination: "Destination",
-      step1Title: "Arrival Stop Destination",
-      tapMapTip: "Tap on map 📍",
-      tapMapPrompt: "Tap on the Google Map to drop a pin",
-      tapMapSub: "or search and pick your saved favorite below",
-      demoStation: "Example: Central Station",
-      addToFavs: "Add to favorites",
-      favSaved: "Saved to favorites ⭐",
-      centerOnMap: "Center on map",
-      quickFavs: "Favorite Places",
-      manageAll: "Manage",
-      step2Title: "Alert Distance Radius",
-      radiusMin: "100m (Bus/Tram)",
-      radiusMax: "5km (Train/Express)",
-      radiusDesc: "Alarm will trigger automatically",
-      step3Title: "Alarm Tone & Vibration",
-      siren: "Siren",
-      sirenSub: "Loud & Clear",
-      urgent: "Urgent",
-      urgentSub: "Triple Beeps",
-      soft: "Gentle",
-      softSub: "Melodic Chime",
-      testSound: "Test Sound",
-      vibration: "📳 Vibration",
-      startTracking: "Start GPS Route Tracking",
-      startHint: "Select a destination on map to activate alarm",
-      trackingActive: "GPS TRACKING ACTIVE",
-      remainingDistance: "Remaining Distance",
-      calculating: "Calculating…",
-      start: "START",
-      inAlertZone: "📍 INSIDE ALERT RADIUS!",
-      kmh: "km/h",
-      bearing: "Bearing",
-      eta: "ETA",
-      radius: "Radius",
-      heading: "Heading :",
-      muteSound: "🔕 Mute sound",
-      unmuteSound: "🔔 Unmute sound",
-      stopTracking: "Stop tracking",
-      sponsored: "Sponsored",
-      adLabel: "Ad",
-      viewAd: "View",
-      alarmHeader: "⚠️ ARRIVAL PROXIMITY ALARM ⚠️",
-      alarmTitle: "You have arrived at your stop!",
-      alarmActiveMsg: "Audio alarm and vibration active",
-      alarmDismiss: "■ Stop alarm & tracking",
-      alarmMuteOnly: "Mute sound and continue to stop",
-      prepareToLeave: "Prepare to exit • Keep your belongings safe",
-      favModalTitle: "Saved Favorites",
-      favModalSub: "Save your frequent stops with custom names",
-      addFavHeading: "Name current location",
-      saveBtn: "Save",
-      suggHome: "Home",
-      suggWork: "Work",
-      suggStation: "Station",
-      suggUniv: "University",
-      favSelectHint: "💡 Tap any favorite to set it as destination instantly.",
-      discoverOffer: "Explore offer",
-      mapType: "Map Layer",
-      remaining: "remaining",
-      sheetHintOpen: "Swipe to configure",
-      sheetHintClose: "Swipe to view map",
-      noFavs: "No favorites saved yet. Add your daily stops!"
+      dir:'ltr', logoTitle:'ARRIVA', subTitle:'Google Maps • GPS Wake-Up',
+      searchPlaceholder:'Search station, stop, metro, address...',
+      searchingGPS:'Acquiring GPS...', gpsReady:'GPS locked (±{acc}m)', gpsError:'GPS unavailable',
+      mapTitle:'Map Provider', sheetHint:'Swipe to see full map',
+      navMenu:'Menu', secMap:'Map', secFav:'Favorites', secLang:'Language', secSettings:'Settings', secAbout:'About',
+      step1:'Destination (Stop / Station)', clickMap:'Tap on map 📍',
+      noDestTitle:'Tap anywhere on Google Maps to drop a pin', noDestSub:'or choose a saved favorite location below',
+      destSelected:'Selected destination', addFav:'Add to favorites', favSaved:'Saved favorite ⭐', centerMap:'Center on map',
+      quickFavs:'⭐ Favorite Places', manageFavs:'Manage all',
+      step2:'Wake-Up Alert Radius', radBus:'100m (Bus/Tram)', radTrain:'5 km (Express Train)',
+      radExpl:'🔔 The alarm will sound when you are {m} away from destination.',
+      settingsTone:'Alarm tone', siren:'Loud Siren', urgent:'Urgent Beeps', soft:'Gentle Chime',
+      testTone:'Test sound', stopTone:'Stop sound', vibrate:'📳 Vibration', themeLabel:'🌙 Dark mode',
+      startTrip:'Start Journey Tracking', startTripDisabled:'Set a destination to start tracking',
+      adSponsored:'SPONSORED', adPartner:'Partner Deal', adTitleDefault:'Discounted train & coach tickets', adSubDefault:'Save up to 35% on your daily commutes and trips', adDiscover:'View', adTrackHint:'Travel comfort & noise-cancelling deals',
+      trackStatus:'GPS TRACKING ACTIVE', remDistTitle:'REMAINING DISTANCE', calculating:'Calculating distance...', startPoint:'START', alertAt:'ALERT AT {m}', speedUnit:'KM/H', headingUnit:'HEADING', etaUnit:'ETA',
+      muteSound:'🔕 Mute sound', unmuteSound:'🔔 Unmute sound', stopTrip:'Stop tracking',
+      favInputLbl:'Save current destination with a custom name:', favInputPlaceholder:'Ex: Home, Main Station, Office, Campus...', saveBtn:'Save',
+      noFavsYet:'No favorites saved yet. Add your daily stops for 1-click access!',
+      alarmTag:'PROXIMITY ALERT', alarmMain:'Wake up! You are arriving at your stop.', alarmDistSub:'REMAINING DISTANCE', alarmOff:'■ Stop alarm & trip', alarmMuteOnly:'Mute alarm and continue tracking', alarmAd:'Book your onward ride or taxi with special discount',
+      tagHome:'🏠 Home', tagWork:'💼 Work', tagStation:'🚉 Station', tagSchool:'🎓 Campus', tagMosque:'📍 Favorite place',
+      aboutDesc:'ARRIVA is a smart GPS wake-up alarm based on Google Maps. It wakes you up automatically before reaching your bus or train stop.',
+      apkTitle:'📱 Convert to APK app', installPwa:'⬇ Install app (PWA)'
     }
   };
 
   var currentLang = 'ar';
-  try {
-    currentLang = localStorage.getItem('arriva_lang') || 'ar';
-  } catch (e) {}
+  try { var savedLang = localStorage.getItem('arriva_lang'); if (savedLang && I18N[savedLang]) currentLang = savedLang; } catch (e) {}
 
-  function setLanguage(lang) {
-    if (!I18N[lang]) lang = 'ar';
-    currentLang = lang;
-    try { localStorage.setItem('arriva_lang', lang); } catch (e) {}
+  var $ = function (id) { return document.getElementById(id); };
+  var isMobile = function () { return window.innerWidth < 768; };
 
-    var isRtl = lang === 'ar';
-    document.documentElement.lang = lang;
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+  var S = {
+    user:null, accuracy:null, speed:null, dest:null, destName:'',
+    radius:500, tracking:false, watchId:null, elapsedTimer:null, startTime:null,
+    initialDistance:null, alarmActive:false, muted:false, alarmType:'siren', vibration:true,
+    favorites:[], sheetCollapsed:false, theme:'dark'
+  };
+  try { S.favorites = JSON.parse(localStorage.getItem('arriva_fav_places') || '[]'); } catch (e) { S.favorites = []; }
+  try { S.theme = localStorage.getItem('arriva_theme') || 'dark'; } catch(e) {}
 
-    var langLabels = { ar: 'العربية', fr: 'Français', en: 'English' };
-    $('langCurrentLabel').textContent = langLabels[lang];
-
-    // Apply translations
-    var dict = I18N[lang];
-    document.querySelectorAll('[data-i18n]').forEach(function (el) {
-      var k = el.getAttribute('data-i18n');
-      if (dict[k]) el.textContent = dict[k];
-    });
-
-    $('searchInput').placeholder = lang === 'ar' ? 'ابحث عن محطة، مترو، قطار، أو عنوان…' : (lang === 'fr' ? 'Rechercher gare, arrêt, métro, adresse…' : 'Search station, subway, address…');
-    checkIfCurrentIsFav();
-    renderFavorites();
+  if (!S.favorites || S.favorites.length === 0) {
+    S.favorites = [
+      { name: currentLang === 'ar' ? 'محطة القطار المركزية' : (currentLang === 'en' ? 'Central Station' : 'Gare Centrale'), lat: 48.8448, lng: 2.3735 },
+      { name: currentLang === 'ar' ? 'المنزل' : (currentLang === 'en' ? 'Home' : 'Maison'), lat: 48.8566, lng: 2.3522 }
+    ];
   }
 
-  /* =========================================================================
-     2. GEODESY & MATHEMATICS (HAVERSINE & BEARING)
-     ========================================================================= */
+  // ===== GÉODÉSIE =====
   var EARTH_RADIUS = 6371000;
-
   function toRad(d) { return (d * Math.PI) / 180; }
-
   function haversine(a, b) {
     if (!a || !b) return null;
-    var dLat = toRad(b.lat - a.lat);
-    var dLng = toRad(b.lng - a.lng);
-    var lat1 = toRad(a.lat);
-    var lat2 = toRad(b.lat);
-    var h = Math.pow(Math.sin(dLat / 2), 2) + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin(dLng / 2), 2);
+    var dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+    var lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+    var h = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)*Math.sin(dLng/2);
     return 2 * EARTH_RADIUS * Math.asin(Math.sqrt(h));
   }
-
   function bearing(a, b) {
     if (!a || !b) return 0;
     var dLng = toRad(b.lng - a.lng);
@@ -1251,1116 +673,636 @@
     var x = Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) - Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(dLng);
     return ((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
   }
-
   function fmtDist(m) {
     if (m === null || m === undefined || isNaN(m)) return '—';
-    if (m < 1000) return Math.round(m) + (currentLang === 'ar' ? ' م' : ' m');
-    if (m < 10000) return (m / 1000).toFixed(2) + (currentLang === 'ar' ? ' كم' : ' km');
-    return (m / 1000).toFixed(1) + (currentLang === 'ar' ? ' كم' : ' km');
+    if (m < 1000) return Math.round(m) + ' m';
+    return (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
   }
-
-  function fmtDistShort(m) {
-    if (m === null || m === undefined || isNaN(m)) return '—';
-    if (m < 1000) return Math.round(m) + (currentLang === 'ar' ? 'م' : 'm');
-    return (m / 1000).toFixed(m < 10000 ? 1 : 0) + (currentLang === 'ar' ? 'كم' : 'km');
+  function compDirection(deg) {
+    var dirs = ['N','NE','E','SE','S','SW','W','NW'];
+    if (currentLang === 'ar') dirs = ['شمال','شمال-شرق','شرق','جنوب-شرق','جنوب','جنوب-غرب','غرب','شمال-غرب'];
+    return dirs[Math.round(deg / 45) % 8];
   }
-
-  function fmtCompass(deg) {
-    var cardinals = currentLang === 'ar' ? ['ش', 'ش.ش', 'ش', 'ج.ش', 'ج', 'ج.غ', 'غ', 'ش.غ'] : ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    return cardinals[Math.round(deg / 45) % 8];
-  }
-
   function fmtETA(seconds) {
-    if (!seconds || !isFinite(seconds) || seconds <= 0) return '—';
-    if (seconds < 60) return Math.round(seconds) + (currentLang === 'ar' ? ' ث' : 's');
-    if (seconds < 3600) return Math.round(seconds / 60) + (currentLang === 'ar' ? ' دقيقة' : ' min');
-    return (seconds / 3600).toFixed(1) + (currentLang === 'ar' ? ' ساعة' : 'h');
+    if (!seconds || !isFinite(seconds)) return '—';
+    if (seconds < 60) return Math.round(seconds) + ' s';
+    if (seconds < 3600) return Math.round(seconds / 60) + ' min';
+    return (seconds / 3600).toFixed(1) + ' h';
   }
 
-  /* =========================================================================
-     3. APP STATE & LOCAL STORAGE
-     ========================================================================= */
-  var S = {
-    user: null,
-    accuracy: null,
-    speed: null,
-    dest: null,
-    destName: '',
-    radius: 500,
-    tracking: false,
-    watchId: null,
-    demoTimer: null,
-    elapsedTimer: null,
-    alarmActive: false,
-    muted: false,
-    alarmType: 'siren',
-    vibration: true,
-    initialDistance: null,
-    startTime: null,
-    wakeLock: null,
-    favorites: [],
-    sheetCollapsed: false
-  };
-
-  try {
-    S.favorites = JSON.parse(localStorage.getItem('arriva_favs') || '[]');
-  } catch (e) {
-    S.favorites = [];
-  }
-
-  /* =========================================================================
-     4. TOAST ALERTS
-     ========================================================================= */
+  // ===== TOAST =====
   function toast(msg, type) {
-    var colors = {
-      info: 'border-indigo-500/40 text-indigo-200',
-      success: 'border-emerald-500/50 text-emerald-200',
-      warn: 'border-amber-500/50 text-amber-200',
-      error: 'border-rose-500/50 text-rose-200'
-    };
-    var icons = { info: '💡', success: '✅', warn: '⚠️', error: '❌' };
-    var el = document.createElement('div');
-    el.className = 'toast glass rounded-2xl px-4 py-2.5 text-[12.5px] font-bold border pointer-events-auto shadow-2xl flex items-center gap-2.5 ' + (colors[type] || colors.info);
-    el.innerHTML = '<span>' + (icons[type] || '💡') + '</span><span>' + msg + '</span>';
-    $('toasts').appendChild(el);
+    var icons = { success:'✅', warn:'⚠️', error:'❌', info:'💡' };
+    var colors = { success:'border-green-500/40 text-green-300', warn:'border-amber-500/40 text-amber-300', error:'border-red-500/40 text-red-300', info:'border-indigo-500/40 text-indigo-300' };
+    var box = document.createElement('div');
+    box.className = 'toast glass rounded-2xl px-4 py-2.5 text-[12.5px] font-bold border pointer-events-auto shadow-2xl flex items-center gap-2.5 ' + (colors[type] || colors.info);
+    box.innerHTML = '<span>' + (icons[type] || '💡') + '</span><span>' + msg + '</span>';
+    $('toastContainer').appendChild(box);
     setTimeout(function () {
-      el.classList.add('out');
-      setTimeout(function () { el.remove(); }, 280);
-    }, 3400);
+      box.style.opacity = '0'; box.style.transform = 'translateY(-10px)'; box.style.transition = 'all 0.3s ease';
+      setTimeout(function () { box.remove(); }, 300);
+    }, 3200);
   }
 
-  /* =========================================================================
-     5. GOOGLE MAPS & CARTO INTEGRATION (LEAFLET TILE ENGINE)
-     ========================================================================= */
-  var MAPS = {
-    google_road: {
-      label: 'Google Maps',
-      sub: 'Google Roadmap Official',
-      url: 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-      subs: ['mt0', 'mt1', 'mt2', 'mt3'],
-      attr: '© Google Maps',
-      max: 20,
-      icon: '🗺️'
-    },
-    google_sat: {
-      label: 'Google Satellite',
-      sub: 'Google Aerial Imagery',
-      url: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-      subs: ['mt0', 'mt1', 'mt2', 'mt3'],
-      attr: '© Google Satellite',
-      max: 20,
-      icon: '🛰️'
-    },
-    google_hybrid: {
-      label: 'Google Hybrid',
-      sub: 'Google Satellite + Roads',
-      url: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-      subs: ['mt0', 'mt1', 'mt2', 'mt3'],
-      attr: '© Google Maps Hybrid',
-      max: 20,
-      icon: '🌍'
-    },
-    google_terrain: {
-      label: 'Google Terrain',
-      sub: 'Relief & Contours',
-      url: 'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
-      subs: ['mt0', 'mt1', 'mt2', 'mt3'],
-      attr: '© Google Maps Relief',
-      max: 20,
-      icon: '⛰️'
-    },
-    osm_standard: {
-      label: 'OpenStreetMap',
-      sub: 'Carto Voyager Standard',
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-      subs: ['a', 'b', 'c', 'd'],
-      attr: '© OpenStreetMap © CARTO',
-      max: 19,
-      icon: '🧭'
+  // ===== LANGUE =====
+  function applyLanguage(lang) {
+    if (!I18N[lang]) lang = 'ar';
+    currentLang = lang;
+    try { localStorage.setItem('arriva_lang', lang); } catch (e) {}
+    var t = I18N[lang];
+    document.documentElement.lang = lang;
+    document.documentElement.dir = t.dir;
+
+    ['ar','fr','en'].forEach(function (l) {
+      var btn = $('langBtn' + l.charAt(0).toUpperCase() + l.slice(1));
+      if (btn) btn.classList.toggle('active', l === lang);
+    });
+
+    $('appLogoTitle').textContent = t.logoTitle;
+    $('appSubTitle').textContent = t.subTitle;
+    $('searchInput').placeholder = t.searchPlaceholder;
+    $('txtMapSelectTitle').textContent = t.mapTitle;
+    $('sheetHintText').textContent = t.sheetHint;
+    $('navDrawerTitle').textContent = t.navMenu;
+    $('navSecMap').textContent = t.secMap;
+    $('navSecFav').textContent = t.secFav;
+    $('navSecLang').textContent = t.secLang;
+    $('navSecSettings').textContent = t.secSettings;
+    $('navSecAbout').textContent = t.secAbout;
+
+    $('step1Title').textContent = t.step1;
+    $('clickMapHint').textContent = t.clickMap;
+    $('noDestTxt1').textContent = t.noDestTitle;
+    $('noDestTxt2').textContent = t.noDestSub;
+    $('txtSaveFavBtn').textContent = t.addFav;
+    $('txtCenterMapBtn').textContent = t.centerMap;
+    $('txtQuickFavsTitle').textContent = t.quickFavs;
+    $('btnManageAllFavs').textContent = t.manageFavs;
+
+    $('step2Title').textContent = t.step2;
+    $('txtRadBus').textContent = t.radBus;
+    $('txtRadTrain').textContent = t.radTrain;
+    $('radExplMeters').textContent = fmtDist(S.radius);
+    $('txtRadExplanation').innerHTML = t.radExpl.replace('{m}', '<strong class="text-white">' + fmtDist(S.radius) + '</strong>');
+
+    $('txtSettingsTone').textContent = t.settingsTone;
+    $('txtToneSiren').textContent = t.siren;
+    $('txtToneUrgent').textContent = t.urgent;
+    $('txtToneSoft').textContent = t.soft;
+    $('txtTestAudio').textContent = t.testTone;
+    $('txtVibrateLabel').textContent = t.vibrate;
+    $('txtThemeLabel').textContent = t.themeLabel;
+    $('txtStartBtn').textContent = t.startTrip;
+    $('txtStartDisabledHint').textContent = t.startTripDisabled;
+
+    $('badgeSponsored').textContent = t.adSponsored;
+    $('txtAdPartner').textContent = t.adPartner;
+    $('adBannerTitle').textContent = t.adTitleDefault;
+    $('adBannerSubtitle').textContent = t.adSubDefault;
+    $('txtAdDiscover').textContent = t.adDiscover;
+    $('txtTrackAdHint').textContent = t.adTrackHint;
+
+    $('txtLiveStatus').textContent = t.trackStatus;
+    $('txtRemainingDistTitle').textContent = t.remDistTitle;
+    $('txtStartPoint').textContent = t.startPoint;
+    $('txtAlertThreshold').textContent = t.alertAt.replace('{m}', fmtDist(S.radius));
+    $('txtSpeedUnit').textContent = t.speedUnit;
+    $('txtHeadingUnit').textContent = t.headingUnit;
+    $('txtEtaUnit').textContent = t.etaUnit;
+    $('txtMuteBtn').textContent = S.muted ? t.unmuteSound : t.muteSound;
+    $('txtStopTripBtn').textContent = t.stopTrip;
+
+    $('lblFavInput').textContent = t.favInputLbl;
+    $('inputFavCustomName').placeholder = t.favInputPlaceholder;
+    $('txtSaveConfirm').textContent = t.saveBtn;
+
+    $('txtAlarmTag').textContent = t.alarmTag;
+    $('txtAlarmMainTitle').textContent = t.alarmMain;
+    $('txtAlarmDistSub').textContent = t.alarmDistSub;
+    $('txtAlarmOffBtn').textContent = t.alarmOff;
+    $('txtAlarmMuteOnlyBtn').textContent = t.alarmMuteOnly;
+    $('txtAlarmAdSponsor').textContent = t.alarmAd;
+
+    $('aboutDesc').textContent = t.aboutDesc;
+    $('apkTitle').textContent = t.apkTitle;
+    $('btnInstallPwa').textContent = t.installPwa;
+
+    var tags = document.querySelectorAll('.fav-quick-tag');
+    if (tags.length >= 5) {
+      tags[0].textContent = t.tagHome; tags[1].textContent = t.tagWork; tags[2].textContent = t.tagStation;
+      tags[3].textContent = t.tagSchool; tags[4].textContent = t.tagMosque;
     }
+
+    renderFavoritesList();
+    renderQuickFavsChips();
+    renderMapLayersList();
+    updateDestCardDisplay();
+  }
+
+  // ===== MAP =====
+  var MAP_STYLES = {
+    google_roadmap: { name:{ar:'خرائط جوجل (طرق)', fr:'Google Maps (Plan)', en:'Google Maps (Roads)'}, url:'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', subdomains:['0','1','2','3'], attr:'© Google Maps' },
+    google_satellite: { name:{ar:'خرائط جوجل (أقمار)', fr:'Google Maps (Satellite)', en:'Google Maps (Satellite)'}, url:'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', subdomains:['0','1','2','3'], attr:'© Google Maps Satellite' },
+    google_hybrid: { name:{ar:'خرائط جوجل (هجين)', fr:'Google Maps (Hybride)', en:'Google Maps (Hybrid)'}, url:'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', subdomains:['0','1','2','3'], attr:'© Google Maps Hybride' },
+    google_terrain: { name:{ar:'خرائط جوجل (تضاريس)', fr:'Google Maps (Relief)', en:'Google Maps (Terrain)'}, url:'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', subdomains:['0','1','2','3'], attr:'© Google Maps Terrain' },
+    carto_voyager: { name:{ar:'CARTO / OSM', fr:'CARTO / OpenStreetMap', en:'CARTO / OpenStreetMap'}, url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', subdomains:['a','b','c','d'], attr:'© OpenStreetMap contributors' }
   };
+  var activeMapKey = 'google_roadmap';
+  var map = null, mapTiles = null, userMarker = null, destMarker = null, radiusCircle = null, routePolyline = null;
 
-  var curMap = 'google_road';
-  try {
-    curMap = localStorage.getItem('arriva_map') || 'google_road';
-  } catch (e) {}
-  if (!MAPS[curMap]) curMap = 'google_road';
+  var userIcon = L.divIcon({ className:'', html:'<div class="user-wrap"><div class="user-radar"></div><div class="user-pulse-ring"></div><div class="user-dot"></div></div>', iconSize:[28,28], iconAnchor:[14,14] });
+  var destIcon = L.divIcon({ className:'', html:'<div class="dest-pin-wrap"><div class="dest-pin"><svg viewBox="0 0 44 52"><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30s22-14 22-30C44 10 34 0 22 0z" fill="#ff2d55"/><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30V0z" fill="#e11d48"/><circle cx="22" cy="21" r="9" fill="#fff"/><circle cx="22" cy="21" r="4.5" fill="#ff2d55"/></svg></div></div>', iconSize:[44,52], iconAnchor:[22,50] });
 
-  var map = null, tiles = null;
-  var userMarker = null, destMarker = null, radiusCircle = null, accuracyCircle = null, routeLine = null;
-
-  var uIcon = L.divIcon({
-    className: '',
-    html: '<div class="user-wrap"><div class="user-radar"></div><div class="user-pulse-ring"></div><div class="user-dot"></div></div>',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
-  });
-
-  var dIcon = L.divIcon({
-    className: '',
-    html: '<div class="dest-pin-wrap"><div class="dest-pin">' +
-          '<svg viewBox="0 0 44 52"><path d="M22 0C10 0 0 10 0 22c0 16 22 30 22 30s22-14 22-30C44 10 34 0 22 0z" fill="#ff2d55"/>' +
-          '<circle cx="22" cy="21" r="9" fill="#fff"/><circle cx="22" cy="21" r="4.5" fill="#ff2d55"/></svg></div></div>',
-    iconSize: [44, 52],
-    iconAnchor: [22, 50]
-  });
-
-  function initMap() {
-    map = L.map('map', {
-      zoomControl: false,
-      attributionControl: true,
-      preferCanvas: true
-    }).setView([24.7136, 46.6753], 13); // Default city Riyadh / adaptable
-
+  function initGoogleMap() {
+    map = L.map('map', { zoomControl:false, attributionControl:true }).setView([48.8566, 2.3522], 13);
     map.attributionControl.setPrefix('ARRIVA');
-    switchMap(curMap, true);
-
+    setMapLayer(activeMapKey, true);
     map.on('click', function (e) {
-      setDestination({ lat: e.latlng.lat, lng: e.latlng.lng }, false);
+      setDestination({ lat:e.latlng.lat, lng:e.latlng.lng }, null);
       reverseGeocode(e.latlng.lat, e.latlng.lng);
-      if (window.innerWidth < 768) collapseDrawer(true);
+      if (isMobile()) collapseSheet(true);
     });
-
-    window.addEventListener('resize', function () { if (map) map.invalidateSize(); });
+    setTimeout(function () { map.invalidateSize(); }, 300);
   }
-
-  function switchMap(k, silent) {
-    if (!MAPS[k]) k = 'google_road';
-    curMap = k;
-    if (tiles && map) map.removeLayer(tiles);
-
-    var layerDef = MAPS[k];
-    tiles = L.tileLayer(layerDef.url, {
-      maxZoom: layerDef.max,
-      subdomains: layerDef.subs || ['mt0', 'mt1', 'mt2', 'mt3'],
-      attribution: layerDef.attr,
-      crossOrigin: true
-    }).addTo(map);
-
-    $('mapBadgeText').textContent = layerDef.label;
-    document.querySelectorAll('.map-opt').forEach(function (b) {
-      b.classList.toggle('active', b.dataset.mapstyle === k);
-    });
-
-    try { localStorage.setItem('arriva_map', k); } catch (e) {}
-    if (!silent) toast((currentLang === 'ar' ? 'الخريطة النشطة: ' : 'Carte : ') + layerDef.label, 'success');
+  function setMapLayer(key, silent) {
+    if (!MAP_STYLES[key]) key = 'google_roadmap';
+    activeMapKey = key;
+    var style = MAP_STYLES[key];
+    if (mapTiles && map) map.removeLayer(mapTiles);
+    mapTiles = L.tileLayer(style.url, { subdomains:style.subdomains, attribution:style.attr, maxZoom:20 }).addTo(map);
+    $('mapTypeName').textContent = (style.name[currentLang] || style.name.en).split('(')[0].trim();
+    if (!silent) toast((style.name[currentLang] || style.name.en), 'info');
+    renderMapLayersList();
   }
-
-  function renderMapOptions() {
-    var box = $('mapStyleList');
-    box.innerHTML = '';
-    Object.keys(MAPS).forEach(function (k) {
-      var item = MAPS[k];
-      var btn = document.createElement('button');
-      btn.dataset.mapstyle = k;
-      btn.className = 'map-opt flex items-center gap-2.5 p-2 rounded-xl border text-start w-full ' + (k === curMap ? 'active' : '');
-      btn.style.borderColor = 'var(--border)';
-      btn.innerHTML = '<span class="text-xl shrink-0">' + item.icon + '</span>' +
-                      '<div class="flex-1 min-w-0"><div class="text-[12px] font-bold truncate">' + item.label + '</div><div class="text-[9.5px] text-dim truncate">' + item.sub + '</div></div>' +
-                      (k === curMap ? '<span>✅</span>' : '');
-      btn.onclick = function () {
-        switchMap(k, false);
-        $('mapStylePop').classList.add('hidden');
-      };
-      box.appendChild(btn);
-    });
-  }
-
-  /* =========================================================================
-     6. MARKERS & GEOMETRY UPDATES
-     ========================================================================= */
-  function updateUserMarker() {
-    if (!map || !S.user) return;
-    if (!userMarker) {
-      userMarker = L.marker([S.user.lat, S.user.lng], { icon: uIcon, zIndexOffset: 1000, interactive: false }).addTo(map);
-    } else {
-      userMarker.setLatLng([S.user.lat, S.user.lng]);
-    }
-
-    if (S.accuracy) {
-      if (!accuracyCircle) {
-        accuracyCircle = L.circle([S.user.lat, S.user.lng], {
-          radius: S.accuracy,
-          color: '#22d3ee',
-          weight: 1,
-          opacity: 0.5,
-          fillColor: '#22d3ee',
-          fillOpacity: 0.08,
-          interactive: false
-        }).addTo(map);
-      } else {
-        accuracyCircle.setLatLng([S.user.lat, S.user.lng]).setRadius(S.accuracy);
-      }
-    }
-    updateRouteLine();
-  }
-
-  function updateDestMarker() {
-    if (!map) return;
-    if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
-    if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
-
-    if (S.dest) {
-      destMarker = L.marker([S.dest.lat, S.dest.lng], { icon: dIcon, draggable: true }).addTo(map);
-      destMarker.on('dragend', function () {
-        var p = destMarker.getLatLng();
-        setDestination({ lat: p.lat, lng: p.lng }, true);
-        reverseGeocode(p.lat, p.lng);
+  function renderMapLayersList() {
+    var containers = ['navMapLayersList', 'mapLayersListPop'];
+    containers.forEach(function (cid) {
+      var container = $(cid);
+      if (!container) return;
+      container.innerHTML = '';
+      Object.keys(MAP_STYLES).forEach(function (k) {
+        var item = MAP_STYLES[k];
+        var label = item.name[currentLang] || item.name.en;
+        var b = document.createElement('button');
+        b.className = 'map-layer-row w-full text-start p-2.5 rounded-xl border chip text-[12px] font-bold flex items-center justify-between ' + (k === activeMapKey ? 'active' : '');
+        b.innerHTML = '<span>' + label + '</span>' + (k === activeMapKey ? '<span>✓</span>' : '');
+        b.onclick = function () {
+          setMapLayer(k, false);
+          $('mapStylePop').classList.add('hidden');
+        };
+        container.appendChild(b);
       });
-
-      radiusCircle = L.circle([S.dest.lat, S.dest.lng], {
-        radius: S.radius,
-        color: '#ff2d55',
-        weight: 2.5,
-        opacity: 0.9,
-        dashArray: '8 6',
-        fillColor: '#ff2d55',
-        fillOpacity: 0.12,
-        interactive: false
-      }).addTo(map);
-    }
-    updateRouteLine();
-  }
-
-  function updateRouteLine() {
-    if (!map) return;
-    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-    if (S.user && S.dest) {
-      routeLine = L.polyline([[S.user.lat, S.user.lng], [S.dest.lat, S.dest.lng]], {
-        color: '#22d3ee',
-        weight: 3,
-        opacity: 0.75,
-        dashArray: '6 8',
-        lineCap: 'round',
-        interactive: false
-      }).addTo(map);
-    }
-  }
-
-  function fitRouteBounds() {
-    if (!map || !S.user || !S.dest) return;
-    map.fitBounds(L.latLngBounds([[S.user.lat, S.user.lng], [S.dest.lat, S.dest.lng]]), {
-      padding: [80, 80],
-      maxZoom: 16,
-      animate: true
     });
   }
 
-  /* =========================================================================
-     7. GPS GEOLOCATION ENGINE
-     ========================================================================= */
-  function updateGpsStatus(type, msg) {
-    var dot = $('gpsDot');
-    dot.className = 'w-2 h-2 rounded-full ' + (type === 'ok' ? 'bg-emerald-400' : type === 'warn' ? 'bg-amber-400 animate-pulse' : 'bg-slate-400 animate-pulse');
-    $('gpsText').textContent = msg;
+  function updateMarkers() {
+    if (!map) return;
+    if (S.user) {
+      if (!userMarker) userMarker = L.marker([S.user.lat, S.user.lng], { icon:userIcon, zIndexOffset:900 }).addTo(map);
+      else userMarker.setLatLng([S.user.lat, S.user.lng]);
+    }
+    if (S.dest) {
+      if (!destMarker) {
+        destMarker = L.marker([S.dest.lat, S.dest.lng], { icon:destIcon, draggable:true }).addTo(map);
+        destMarker.on('dragend', function () {
+          var pos = destMarker.getLatLng();
+          setDestination({ lat:pos.lat, lng:pos.lng }, S.destName);
+          reverseGeocode(pos.lat, pos.lng);
+        });
+      } else destMarker.setLatLng([S.dest.lat, S.dest.lng]);
+      if (!radiusCircle) {
+        radiusCircle = L.circle([S.dest.lat, S.dest.lng], { radius:S.radius, color:'#ff2d55', weight:2, dashArray:'8 6', fillColor:'#ff2d55', fillOpacity:0.12 }).addTo(map);
+      } else { radiusCircle.setLatLng([S.dest.lat, S.dest.lng]); radiusCircle.setRadius(S.radius); }
+    } else {
+      if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+      if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
+    }
+    if (S.user && S.dest) {
+      if (!routePolyline) routePolyline = L.polyline([[S.user.lat, S.user.lng],[S.dest.lat, S.dest.lng]], { color:'#22d3ee', weight:3, opacity:0.7, dashArray:'6 8' }).addTo(map);
+      else routePolyline.setLatLngs([[S.user.lat, S.user.lng],[S.dest.lat, S.dest.lng]]);
+    } else if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
   }
 
-  function requestLocation(flyToUser) {
-    if (!('geolocation' in navigator)) {
-      updateGpsStatus('err', 'GPS non supporté');
-      return;
-    }
-    updateGpsStatus('warn', I18N[currentLang].locatingGps);
-    navigator.geolocation.getCurrentPosition(function (pos) {
-      applyPosition(pos, flyToUser);
-      toast(I18N[currentLang].gpsAcquired, 'success');
+  // ===== GPS =====
+  function startGPS() {
+    if (!('geolocation' in navigator)) { $('gpsStatusText').textContent = I18N[currentLang].gpsError; return; }
+    $('gpsStatusText').textContent = I18N[currentLang].searchingGPS;
+    $('gpsStatusDot').className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+    navigator.geolocation.getCurrentPosition(function (p) {
+      handlePositionUpdate(p);
+      if (map && S.user) map.flyTo([S.user.lat, S.user.lng], 14, { duration:1 });
     }, function () {
-      updateGpsStatus('err', 'GPS Offline');
-    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 6000 });
+      $('gpsStatusText').textContent = I18N[currentLang].gpsError;
+      $('gpsStatusDot').className = 'w-2 h-2 rounded-full bg-slate-400';
+    }, { enableHighAccuracy:true, timeout:10000 });
+  }
+  function handlePositionUpdate(p) {
+    S.user = { lat:p.coords.latitude, lng:p.coords.longitude };
+    S.accuracy = Math.round(p.coords.accuracy || 10);
+    S.speed = (p.coords.speed !== null && p.coords.speed >= 0) ? p.coords.speed : 0;
+    $('gpsStatusDot').className = 'w-2 h-2 rounded-full bg-green-400';
+    $('gpsStatusText').textContent = I18N[currentLang].gpsReady.replace('{acc}', S.accuracy);
+    updateMarkers();
+    recalculateTripStats();
   }
 
-  function applyPosition(pos, fly) {
-    S.user = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    S.accuracy = pos.coords.accuracy || 10;
-    if (pos.coords.speed !== null && pos.coords.speed >= 0) S.speed = pos.coords.speed;
-
-    updateUserMarker();
-    updateGpsStatus('ok', 'GPS ±' + Math.round(S.accuracy) + 'm');
-    $('trackAccuracy').textContent = 'GPS ±' + Math.round(S.accuracy) + 'm';
-
-    if (fly && map) map.flyTo([S.user.lat, S.user.lng], 15, { duration: 1.1 });
-    recalculateProximity();
-    updateStartButtonState();
+  // ===== DESTINATION =====
+  function setDestination(pos, name) {
+    S.dest = { lat:pos.lat, lng:pos.lng };
+    S.destName = name || (currentLang === 'ar' ? 'الموقع المحدد على الخريطة' : (currentLang === 'en' ? 'Selected Location' : 'Arrêt sélectionné'));
+    $('cardNoDest').classList.add('hidden');
+    $('cardDestSelected').classList.remove('hidden');
+    $('fitRouteBtn').classList.remove('hidden');
+    $('fitRouteBtn').classList.add('flex');
+    $('btnStartTrip').disabled = false;
+    $('txtStartDisabledHint').classList.add('hidden');
+    updateDestCardDisplay();
+    updateMarkers();
+    recalculateTripStats();
   }
-
-  /* =========================================================================
-     8. DESTINATION MANAGEMENT & GEOCODING
-     ========================================================================= */
-  function setDestination(coords, keepCustomName) {
-    S.dest = { lat: +coords.lat, lng: +coords.lng };
-    if (!keepCustomName) {
-      S.destName = currentLang === 'ar' ? 'المحطة المحددة' : 'Arrêt sélectionné';
-      $('destName').textContent = S.destName;
-      $('alarmDest').textContent = '📍 ' + S.destName;
-    }
-
-    $('noDestCard').classList.add('hidden');
-    $('destCard').classList.remove('hidden');
-    $('destCoords').textContent = S.dest.lat.toFixed(5) + ', ' + S.dest.lng.toFixed(5);
-
-    $('destBadge').classList.remove('hidden');
-    $('destBadge').classList.add('flex');
-    $('destBadgeText').textContent = S.destName.length > 20 ? S.destName.slice(0, 20) + '…' : S.destName;
-
-    $('fitBtn').classList.remove('hidden');
-    $('fitBtn').classList.add('flex');
-    $('miniCompass').classList.remove('hidden');
-
-    checkIfCurrentIsFav();
-    updateDestMarker();
-    recalculateProximity();
-    updateStartButtonState();
-
-    if (S.tracking && S.initialDistance === null && S.user) {
-      S.initialDistance = haversine(S.user, S.dest);
-    }
-  }
-
   function clearDestination() {
-    S.dest = null;
-    S.destName = '';
-    $('noDestCard').classList.remove('hidden');
-    $('destCard').classList.add('hidden');
-    $('destBadge').classList.add('hidden');
-    $('destBadge').classList.remove('flex');
-    $('fitBtn').classList.add('hidden');
-    $('fitBtn').classList.remove('flex');
-    $('miniCompass').classList.add('hidden');
-    updateDestMarker();
-    updateStartButtonState();
+    S.dest = null; S.destName = '';
+    $('cardNoDest').classList.remove('hidden');
+    $('cardDestSelected').classList.add('hidden');
+    $('fitRouteBtn').classList.add('hidden');
+    $('fitRouteBtn').classList.remove('flex');
+    $('btnStartTrip').disabled = true;
+    $('txtStartDisabledHint').classList.remove('hidden');
+    updateMarkers();
   }
-
-  function setNamedDestination(name, coords) {
-    S.destName = name;
-    $('destName').textContent = name;
-    $('alarmDest').textContent = '📍 ' + name;
-    $('destBadgeText').textContent = name.length > 20 ? name.slice(0, 20) + '…' : name;
-    checkIfCurrentIsFav();
+  function updateDestCardDisplay() {
+    if (!S.dest) return;
+    $('labelDestName').textContent = S.destName;
+    $('labelDestCoords').textContent = S.dest.lat.toFixed(5) + ', ' + S.dest.lng.toFixed(5);
+    $('alarmTargetNameDisplay').textContent = S.destName;
+    if (S.user) $('labelDestDistance').textContent = fmtDist(haversine(S.user, S.dest));
+    var isFav = S.favorites.some(function (f) { return Math.abs(f.lat - S.dest.lat) < 0.0001 && Math.abs(f.lng - S.dest.lng) < 0.0001; });
+    $('txtSaveFavBtn').textContent = isFav ? I18N[currentLang].favSaved : I18N[currentLang].addFav;
   }
-
   function reverseGeocode(lat, lng) {
-    fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&accept-language=' + currentLang + '&zoom=16')
+    fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&accept-language=' + currentLang)
       .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data || !data.display_name) return;
-        var parts = data.display_name.split(',');
-        var shortName = (parts[0] || '').trim() + (parts[1] ? ' (' + parts[1].trim() + ')' : '');
-        setNamedDestination(shortName, { lat: lat, lng: lng });
-      })
+      .then(function (d) { if (d && d.display_name) { S.destName = d.display_name.split(',').slice(0,2).join(', ').trim(); updateDestCardDisplay(); } })
       .catch(function () {});
   }
 
-  /* =========================================================================
-     9. NAMED FAVORITES SYSTEM (CRUD & QUICK SELECTION)
-     ========================================================================= */
-  function renderFavorites() {
-    var container = $('favListContainer');
-    var quickList = $('favQuickList');
-    var quickWrap = $('favQuickWrap');
-    var badge = $('favCountBadge');
+  // ===== SEARCH =====
+  var searchTimeout = null;
+  $('searchInput').addEventListener('input', function (e) {
+    var query = e.target.value.trim();
+    $('searchClear').classList.toggle('hidden', !query);
+    $('searchClear').classList.toggle('flex', !!query);
+    clearTimeout(searchTimeout);
+    if (query.length < 3) { $('searchResults').classList.add('hidden'); return; }
+    $('searchSpinner').classList.remove('hidden');
+    searchTimeout = setTimeout(function () {
+      fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query) + '&format=json&limit=5&accept-language=' + currentLang)
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          $('searchSpinner').classList.add('hidden');
+          var box = $('searchResults');
+          box.innerHTML = '';
+          if (!res || res.length === 0) {
+            box.innerHTML = '<div class="p-3 text-[12px] text-dim text-center">' + (currentLang === 'ar' ? 'لا توجد نتائج' : 'No results') + '</div>';
+          } else {
+            res.forEach(function (item) {
+              var row = document.createElement('div');
+              row.className = 'p-3 border-b border-white/5 cursor-pointer hover:bg-white/10 flex items-center gap-2.5 transition';
+              var title = item.display_name.split(',')[0];
+              var sub = item.display_name.split(',').slice(1,3).join(',');
+              row.innerHTML = '<div class="w-7 h-7 rounded-lg chip flex items-center justify-center shrink-0 text-xs">📍</div><div class="flex-1 min-w-0"><div class="font-bold text-[13px] truncate">' + title + '</div><div class="text-[10px] text-dim truncate">' + sub + '</div></div>';
+              row.onclick = function () {
+                var p = { lat:parseFloat(item.lat), lng:parseFloat(item.lon) };
+                setDestination(p, title);
+                $('searchResults').classList.add('hidden');
+                $('searchInput').value = '';
+                $('searchClear').classList.add('hidden');
+                if (map) map.flyTo([p.lat, p.lng], 15, { duration:1.2 });
+              };
+              box.appendChild(row);
+            });
+          }
+          box.classList.remove('hidden');
+        }).catch(function () { $('searchSpinner').classList.add('hidden'); });
+    }, 400);
+  });
+  $('searchClear').onclick = function () { $('searchInput').value=''; $('searchResults').classList.add('hidden'); $('searchClear').classList.add('hidden'); };
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#searchResults') && !e.target.closest('#searchInput')) $('searchResults').classList.add('hidden');
+    if (!e.target.closest('#mapStylePop') && !e.target.closest('#mapLayersMenuBtn') && !e.target.closest('#mapTypeToggleBtn')) $('mapStylePop').classList.add('hidden');
+  });
 
-    if (S.favorites.length > 0) {
-      badge.textContent = S.favorites.length;
-      badge.classList.remove('hidden');
-      badge.classList.add('flex');
-      quickWrap.classList.remove('hidden');
-    } else {
-      badge.classList.add('hidden');
-      badge.classList.remove('flex');
-      quickWrap.classList.add('hidden');
-    }
-
-    container.innerHTML = '';
-    if (S.favorites.length === 0) {
-      container.innerHTML = '<div class="text-center py-8 text-slate-400 text-[13px]">' + I18N[currentLang].noFavs + '</div>';
-    } else {
-      S.favorites.forEach(function (fav, index) {
-        var card = document.createElement('div');
-        card.className = 'flex items-center justify-between p-3 rounded-2xl bg-white/5 hover:bg-white/10 cursor-pointer border border-white/5 transition';
-        card.innerHTML = '<div class="min-w-0 flex-1 pe-2">' +
-                         '<div class="font-bold text-[13px] truncate text-amber-300 flex items-center gap-1.5"><span>⭐</span><span>' + fav.name + '</span></div>' +
-                         '<div class="text-[10px] text-dim font-mono mt-0.5">' + (+fav.lat).toFixed(4) + ', ' + (+fav.lng).toFixed(4) + '</div>' +
-                         '</div>' +
-                         '<div class="flex items-center gap-1.5 shrink-0">' +
-                         '<button data-fav-idx="' + index + '" class="select-fav px-3 py-1 rounded-xl bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 text-[11px] font-bold">' + (currentLang === 'ar' ? 'اختيار' : 'Choisir') + '</button>' +
-                         '<button data-del-idx="' + index + '" class="del-fav w-7 h-7 rounded-xl bg-red-500/20 text-red-300 text-[12px] font-bold flex items-center justify-center hover:bg-red-500/30">✕</button>' +
-                         '</div>';
-        
-        card.onclick = function (e) {
-          if (e.target.closest('.del-fav')) return;
-          loadFavorite(fav);
-          $('favModal').classList.remove('open');
-        };
-        container.appendChild(card);
-      });
-
-      container.querySelectorAll('.del-fav').forEach(function (btn) {
-        btn.onclick = function (e) {
-          e.stopPropagation();
-          deleteFavorite(+btn.dataset.delIdx);
-        };
-      });
-
-      container.querySelectorAll('.select-fav').forEach(function (btn) {
-        btn.onclick = function (e) {
-          e.stopPropagation();
-          loadFavorite(S.favorites[+btn.dataset.favIdx]);
-          $('favModal').classList.remove('open');
-        };
-      });
-    }
-
-    // Quick horizontal list
-    quickList.innerHTML = '';
-    S.favorites.forEach(function (fav) {
-      var qBtn = document.createElement('button');
-      qBtn.className = 'shrink-0 chip rounded-full px-3 py-1.5 text-[11px] font-bold whitespace-nowrap hover:bg-amber-500/20 text-amber-300 border-amber-400/30 transition flex items-center gap-1.5';
-      qBtn.innerHTML = '<span>⭐</span><span>' + (fav.name.length > 18 ? fav.name.slice(0, 18) + '…' : fav.name) + '</span>';
-      qBtn.onclick = function () { loadFavorite(fav); };
-      quickList.appendChild(qBtn);
-    });
-
-    checkIfCurrentIsFav();
+  // ===== FAVORIS =====
+  function saveFavoritePlace(name) {
+    if (!S.dest) { toast(currentLang === 'ar' ? 'حدد وجهة أولاً' : 'Set a destination first', 'warn'); return; }
+    var finalName = (name || S.destName || '').trim();
+    if (!finalName) finalName = (currentLang === 'ar' ? 'مكان مفضل ' : 'Favori ') + (S.favorites.length + 1);
+    var idx = S.favorites.findIndex(function (f) { return Math.abs(f.lat - S.dest.lat) < 0.0001 && Math.abs(f.lng - S.dest.lng) < 0.0001; });
+    if (idx >= 0) S.favorites[idx].name = finalName;
+    else S.favorites.unshift({ name:finalName, lat:S.dest.lat, lng:S.dest.lng });
+    try { localStorage.setItem('arriva_fav_places', JSON.stringify(S.favorites)); } catch (e) {}
+    renderFavoritesList(); renderQuickFavsChips(); updateDestCardDisplay();
+    toast(finalName + ' ⭐', 'success');
+    $('inputFavCustomName').value = '';
   }
-
-  function loadFavorite(fav) {
-    var coords = { lat: +fav.lat, lng: +fav.lng };
-    setDestination(coords, true);
-    setNamedDestination(fav.name, coords);
-    if (map) map.flyTo([coords.lat, coords.lng], 15, { duration: 1.1 });
-    toast((currentLang === 'ar' ? 'تم اختيار المفضلة: ' : 'Favori : ') + fav.name + ' ⭐', 'success');
-    if (window.innerWidth < 768) collapseDrawer(true);
-  }
-
-  function saveFavoriteWithName(customName) {
-    if (!S.dest) {
-      toast(currentLang === 'ar' ? 'يرجى تحديد مكان على الخريطة أولاً 📍' : 'Posez un point sur la carte 📍', 'warn');
-      return;
-    }
-    var name = (customName || S.destName || '').trim();
-    if (!name || name === 'Arrêt sélectionné' || name === 'المحطة المحددة') {
-      name = (currentLang === 'ar' ? 'مفضل ' : 'Favori ') + (S.favorites.length + 1);
-    }
-
-    var existingIdx = S.favorites.findIndex(function (f) {
-      return f.name.toLowerCase() === name.toLowerCase() || (Math.abs(f.lat - S.dest.lat) < 0.0001 && Math.abs(f.lng - S.dest.lng) < 0.0001);
-    });
-
-    if (existingIdx >= 0) {
-      S.favorites[existingIdx] = { name: name, lat: S.dest.lat, lng: S.dest.lng };
-    } else {
-      S.favorites.unshift({ name: name, lat: S.dest.lat, lng: S.dest.lng });
-    }
-
-    try { localStorage.setItem('arriva_favs', JSON.stringify(S.favorites)); } catch (e) {}
-    renderFavorites();
-    toast((currentLang === 'ar' ? 'تم حفظ المفضلة: ' : 'Favori sauvegardé : ') + name + ' ⭐', 'success');
-  }
-
   function deleteFavorite(index) {
     if (index < 0 || index >= S.favorites.length) return;
     var name = S.favorites[index].name;
     S.favorites.splice(index, 1);
-    try { localStorage.setItem('arriva_favs', JSON.stringify(S.favorites)); } catch (e) {}
-    renderFavorites();
-    toast((currentLang === 'ar' ? 'تم حذف: ' : 'Supprimé : ') + name, 'info');
+    try { localStorage.setItem('arriva_fav_places', JSON.stringify(S.favorites)); } catch (e) {}
+    renderFavoritesList(); renderQuickFavsChips(); updateDestCardDisplay();
+    toast(name + ' 🗑️', 'info');
   }
-
-  function checkIfCurrentIsFav() {
-    var txtEl = $('saveFavTxt');
-    if (!S.dest) {
-      txtEl.textContent = I18N[currentLang].addToFavs;
+  function applyFavorite(fav) {
+    setDestination({ lat:fav.lat, lng:fav.lng }, fav.name);
+    if (map) map.flyTo([fav.lat, fav.lng], 15, { duration:1 });
+    toast(fav.name + ' ⭐', 'success');
+    closeNavDrawer();
+  }
+  function renderFavoritesList() {
+    var container = $('favListItemsContainer');
+    var badge = $('navFavBadge');
+    if (S.favorites.length > 0) {
+      badge.textContent = S.favorites.length;
+      badge.classList.remove('hidden');
+    } else badge.classList.add('hidden');
+    container.innerHTML = '';
+    if (S.favorites.length === 0) {
+      container.innerHTML = '<div class="text-center py-4 text-dim text-[12px]">' + I18N[currentLang].noFavsYet + '</div>';
       return;
     }
-    var isFav = S.favorites.some(function (f) {
-      return Math.abs(f.lat - S.dest.lat) < 0.0001 && Math.abs(f.lng - S.dest.lng) < 0.0001;
+    S.favorites.forEach(function (fav, i) {
+      var row = document.createElement('div');
+      row.className = 'flex items-center justify-between p-2.5 rounded-2xl chip border cursor-pointer transition hover:bg-white/10';
+      row.innerHTML =
+        '<div class="flex items-center gap-2.5 min-w-0 flex-1">' +
+          '<div class="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">⭐</div>' +
+          '<div class="min-w-0 flex-1">' +
+            '<div class="font-bold text-[13px] truncate text-amber-300">' + fav.name + '</div>' +
+            '<div class="text-[10px] text-dim font-mono">' + fav.lat.toFixed(4) + ', ' + fav.lng.toFixed(4) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="flex items-center gap-1.5 shrink-0">' +
+          '<button data-fav-use="' + i + '" class="px-3 py-1.5 rounded-xl bg-indigo-600/40 text-indigo-300 text-[11px] font-bold hover:bg-indigo-600 btn-tilt">' + (currentLang === 'ar' ? 'اختر' : 'Use') + '</button>' +
+          '<button data-fav-del="' + i + '" class="w-7 h-7 rounded-xl bg-red-500/20 text-red-300 text-[11px] font-bold flex items-center justify-center hover:bg-red-500/40">✕</button>' +
+        '</div>';
+      row.onclick = function (e) { if (!e.target.closest('[data-fav-del]') && !e.target.closest('[data-fav-use]')) applyFavorite(fav); };
+      container.appendChild(row);
     });
-    txtEl.textContent = isFav ? I18N[currentLang].favSaved : I18N[currentLang].addToFavs;
+    container.querySelectorAll('[data-fav-del]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); deleteFavorite(parseInt(b.getAttribute('data-fav-del'), 10)); }; });
+    container.querySelectorAll('[data-fav-use]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); applyFavorite(S.favorites[parseInt(b.getAttribute('data-fav-use'), 10)]); }; });
+  }
+  function renderQuickFavsChips() {
+    var wrap = $('wrapQuickFavs'), container = $('listQuickFavs');
+    container.innerHTML = '';
+    if (!S.favorites || S.favorites.length === 0) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    S.favorites.forEach(function (fav) {
+      var btn = document.createElement('button');
+      btn.className = 'chip rounded-full px-3 py-1.5 text-[11.5px] font-bold shrink-0 flex items-center gap-1.5 text-amber-300 border-amber-400/30 hover:bg-amber-400/20 transition';
+      btn.innerHTML = '<span>⭐</span><span>' + fav.name + '</span>';
+      btn.onclick = function () { applyFavorite(fav); };
+      container.appendChild(btn);
+    });
   }
 
-  /* =========================================================================
-     10. AUDIO SYNTHESIS & VIBRATION ALARM ENGINE
-     ========================================================================= */
-  var audioCtx = null, alarmOsc = null, alarmGain = null, alarmTimer = null;
-
-  function initAudioCtx() {
-    if (!audioCtx) {
-      var AudioConstructor = window.AudioContext || window.webkitAudioContext;
-      if (AudioConstructor) audioCtx = new AudioConstructor();
-    }
+  // ===== AUDIO =====
+  var audioCtx = null, alarmOscillator = null, alarmGain = null, soundInterval = null, isTestingSound = false;
+  function getAudioContext() {
+    if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) audioCtx = new AC(); }
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
-
-  function stopSound() {
-    if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
-    if (alarmOsc) {
-      try { alarmOsc.stop(); alarmOsc.disconnect(); } catch (e) {}
-      alarmOsc = null;
-    }
-    if (alarmGain) {
-      try { alarmGain.disconnect(); } catch (e) {}
-      alarmGain = null;
-    }
-  }
-
-  function playSiren() {
-    var ctx = initAudioCtx();
-    if (!ctx) return;
-    stopSound();
-
-    alarmGain = ctx.createGain();
-    alarmGain.gain.setValueAtTime(0.3, ctx.currentTime);
-    alarmGain.connect(ctx.destination);
-
-    alarmOsc = ctx.createOscillator();
-    alarmOsc.type = 'sawtooth';
-    alarmOsc.connect(alarmGain);
-
-    var now = ctx.currentTime, cycle = 0.85;
-    alarmOsc.frequency.setValueAtTime(520, now);
-    for (var i = 0; i < 80; i++) {
-      alarmOsc.frequency.linearRampToValueAtTime(960, now + i * cycle + cycle / 2);
-      alarmOsc.frequency.linearRampToValueAtTime(520, now + (i + 1) * cycle);
-    }
-    alarmOsc.start();
-  }
-
-  function playUrgentBeeps() {
-    var ctx = initAudioCtx();
-    if (!ctx) return;
-    stopSound();
-
-    alarmGain = ctx.createGain();
-    alarmGain.gain.value = 0.32;
-    alarmGain.connect(ctx.destination);
-
-    alarmOsc = ctx.createOscillator();
-    alarmOsc.type = 'square';
-    alarmOsc.frequency.value = 880;
-    alarmOsc.connect(alarmGain);
-    alarmOsc.start();
-
-    var active = true;
-    alarmTimer = setInterval(function () {
-      if (!alarmGain) return;
-      active = !active;
-      alarmGain.gain.setValueAtTime(active ? 0.32 : 0, ctx.currentTime);
-    }, 180);
-  }
-
-  function playSoftChime() {
-    var ctx = initAudioCtx();
-    if (!ctx) return;
-    stopSound();
-
-    var scale = [523.25, 659.25, 783.99, 1046.50];
-    var step = 0;
-
-    function chimeNote() {
-      var t = ctx.currentTime;
-      var osc = ctx.createOscillator();
-      var g = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = scale[step % scale.length];
-      step++;
-      g.gain.setValueAtTime(0.28, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.65);
-    }
-
-    chimeNote();
-    alarmTimer = setInterval(chimeNote, 500);
-  }
-
   function startAlarmSound() {
-    if (S.alarmType === 'urgent') playUrgentBeeps();
-    else if (S.alarmType === 'soft') playSoftChime();
-    else playSiren();
-  }
-
-  var isTestingSound = false, testSoundTimeout = null;
-  $('testSoundBtn').onclick = function () {
-    initAudioCtx();
-    if (!isTestingSound) {
-      isTestingSound = true;
-      $('testSoundIcon').textContent = '■';
-      $('testEQ').classList.remove('hidden');
-      startAlarmSound();
-      testSoundTimeout = setTimeout(function () {
-        stopSound();
-        isTestingSound = false;
-        $('testSoundIcon').textContent = '▶';
-        $('testEQ').classList.add('hidden');
-      }, 3500);
+    var ctx = getAudioContext(); if (!ctx) return; stopAlarmSound();
+    alarmGain = ctx.createGain(); alarmGain.gain.setValueAtTime(0.35, ctx.currentTime); alarmGain.connect(ctx.destination);
+    if (S.alarmType === 'urgent') {
+      alarmOscillator = ctx.createOscillator(); alarmOscillator.type = 'square'; alarmOscillator.frequency.value = 880;
+      alarmOscillator.connect(alarmGain); alarmOscillator.start();
+      var state = true; soundInterval = setInterval(function () { if (!alarmGain) return; state = !state; alarmGain.gain.setValueAtTime(state ? 0.35 : 0, ctx.currentTime); }, 160);
+    } else if (S.alarmType === 'soft') {
+      var notes = [523.25, 659.25, 783.99, 1046.5], step = 0;
+      function chime() { var t = ctx.currentTime; var osc = ctx.createOscillator(); var g = ctx.createGain(); osc.type = 'sine'; osc.frequency.value = notes[step % notes.length]; step++; g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.6); osc.connect(g); g.connect(ctx.destination); osc.start(t); osc.stop(t + 0.65); }
+      chime(); soundInterval = setInterval(chime, 500);
     } else {
-      clearTimeout(testSoundTimeout);
-      stopSound();
-      isTestingSound = false;
-      $('testSoundIcon').textContent = '▶';
-      $('testEQ').classList.add('hidden');
-    }
-  };
-
-  /* =========================================================================
-     11. ALARM TRIGGER OVERLAY & HAPTICS
-     ========================================================================= */
-  var vibTimer = null;
-
-  function triggerProximityAlarm(dist) {
-    if (S.alarmActive) return;
-    S.alarmActive = true;
-    $('alarmDistance').textContent = fmtDist(dist);
-    $('alarmOverlay').classList.add('active');
-
-    if (!S.muted) startAlarmSound();
-    if (S.vibration && 'vibrate' in navigator) {
-      navigator.vibrate([600, 250, 600, 250, 900]);
-      vibTimer = setInterval(function () {
-        navigator.vibrate([600, 250, 600, 250, 900]);
-      }, 2600);
+      alarmOscillator = ctx.createOscillator(); alarmOscillator.type = 'sawtooth'; alarmOscillator.connect(alarmGain);
+      var now = ctx.currentTime; alarmOscillator.frequency.setValueAtTime(550, now);
+      for (var i = 0; i < 60; i++) { alarmOscillator.frequency.linearRampToValueAtTime(1000, now + i * 0.8 + 0.4); alarmOscillator.frequency.linearRampToValueAtTime(550, now + (i + 1) * 0.8); }
+      alarmOscillator.start();
     }
   }
-
-  function stopAllAlarms() {
-    S.alarmActive = false;
-    stopSound();
-    if (vibTimer) { clearInterval(vibTimer); vibTimer = null; }
-    if ('vibrate' in navigator) navigator.vibrate(0);
-    $('alarmOverlay').classList.remove('active');
+  function stopAlarmSound() {
+    if (soundInterval) { clearInterval(soundInterval); soundInterval = null; }
+    if (alarmOscillator) { try { alarmOscillator.stop(); alarmOscillator.disconnect(); } catch (e) {} alarmOscillator = null; }
+    if (alarmGain) { try { alarmGain.disconnect(); } catch (e) {} alarmGain = null; }
   }
+  var vibInterval = null;
+  function startVibration() { if (!S.vibration || !('vibrate' in navigator)) return; navigator.vibrate([600,300,600,300,800]); vibInterval = setInterval(function () { navigator.vibrate([600,300,600,300,800]); }, 3000); }
+  function stopVibration() { if (vibInterval) { clearInterval(vibInterval); vibInterval = null; } if ('vibrate' in navigator) navigator.vibrate(0); }
 
-  $('alarmStopAll').onclick = function () {
-    stopAllAlarms();
-    stopTracking();
-    toast(currentLang === 'ar' ? 'وصلت بسلام! 🎉' : 'Trajet terminé en sécurité ! 🎉', 'success');
-    setTimeout(showInterstitialAd, 600);
-  };
+  // ===== ALARME =====
+  function triggerArrivalAlarm(dist) { if (S.alarmActive) return; S.alarmActive = true; $('alarmDistanceDisplay').textContent = fmtDist(dist); $('alarmOverlay').classList.add('active'); if (!S.muted) startAlarmSound(); startVibration(); }
+  function dismissAlarm(fullStop) { S.alarmActive = false; stopAlarmSound(); stopVibration(); $('alarmOverlay').classList.remove('active'); if (fullStop) stopTripTracking(); else { S.muted = true; $('txtMuteBtn').textContent = I18N[currentLang].unmuteSound; } }
 
-  $('alarmContinue').onclick = function () {
-    stopAllAlarms();
-    S.muted = true;
-    $('muteBtn').textContent = I18N[currentLang].unmuteSound;
-    toast(currentLang === 'ar' ? 'تم كتم الصوت. يستمر التتبع حتى النزول.' : 'Son coupé. Le suivi continue.', 'info');
-  };
-
-  /* =========================================================================
-     12. ROUTE TRACKING CONTROLLER
-     ========================================================================= */
-  function startTracking() {
-    if (!S.dest) return;
-    initAudioCtx();
-
-    S.tracking = true;
-    S.startTime = Date.now();
-    S.muted = false;
-    S.alarmActive = false;
-
-    $('panelSetup').classList.add('hidden');
-    $('panelTracking').classList.remove('hidden');
-    $('bannerAd').classList.add('hidden');
-    collapseDrawer(false);
-
+  // ===== TRAJET =====
+  function startTripTracking() {
+    if (!S.dest) return; getAudioContext();
+    S.tracking = true; S.startTime = Date.now(); S.muted = false; S.alarmActive = false;
+    $('viewSetup').classList.add('hidden'); $('viewTracking').classList.remove('hidden');
     if (S.user) S.initialDistance = haversine(S.user, S.dest);
-
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').then(function (w) { S.wakeLock = w; }).catch(function () {});
-    }
-
     S.elapsedTimer = setInterval(function () {
-      var sec = Math.floor((Date.now() - S.startTime) / 1000);
-      var m = Math.floor(sec / 60), s = sec % 60;
-      $('elapsedTime').textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      var s = Math.floor((Date.now() - S.startTime) / 1000);
+      var m = Math.floor(s / 60), sec = s % 60;
+      $('trackTimer').textContent = (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
     }, 1000);
-
-    if ('geolocation' in navigator) {
-      S.watchId = navigator.geolocation.watchPosition(function (pos) {
-        applyPosition(pos, false);
-      }, function () {}, { enableHighAccuracy: true, maximumAge: 1000 });
-    }
-
-    fitRouteBounds();
-    toast(currentLang === 'ar' ? 'تم تفعيل منبه الوصول الذكي 🚀' : 'Suivi GPS ARRIVA actif 🚀', 'success');
+    if ('geolocation' in navigator) S.watchId = navigator.geolocation.watchPosition(function (p) { handlePositionUpdate(p); }, function () {}, { enableHighAccuracy:true, maximumAge:1000 });
+    if (map && S.user && S.dest) map.fitBounds(L.latLngBounds([[S.user.lat, S.user.lng],[S.dest.lat, S.dest.lng]]), { padding:[70,70], maxZoom:16 });
+    toast(I18N[currentLang].trackStatus, 'success');
   }
-
-  function stopTracking() {
+  function stopTripTracking() {
     S.tracking = false;
     if (S.watchId) { navigator.geolocation.clearWatch(S.watchId); S.watchId = null; }
     if (S.elapsedTimer) { clearInterval(S.elapsedTimer); S.elapsedTimer = null; }
-    if (S.wakeLock) {
-      try { S.wakeLock.release(); } catch (e) {}
-      S.wakeLock = null;
-    }
-    stopAllAlarms();
-    $('panelTracking').classList.add('hidden');
-    $('panelSetup').classList.remove('hidden');
-    $('bannerAd').classList.remove('hidden');
+    dismissAlarm(false);
+    $('viewTracking').classList.add('hidden'); $('viewSetup').classList.remove('hidden');
+  }
+  function recalculateTripStats() {
+    if (!S.user || !S.dest) return;
+    var dist = haversine(S.user, S.dest), b = bearing(S.user, S.dest);
+    $('liveRemainingDistance').textContent = fmtDist(dist);
+    $('labelDestDistance').textContent = fmtDist(dist);
+    $('metricHeading').textContent = compDirection(b);
+    $('metricSpeed').textContent = Math.round((S.speed || 0) * 3.6);
+    var etaSec = (S.speed && S.speed > 1) ? (dist / S.speed) : null;
+    $('metricEta').textContent = fmtETA(etaSec);
+    $('liveRemainingSub').textContent = dist <= S.radius ? '⚠️ داخل منطقة التنبيه' : ('ETA: ' + fmtETA(etaSec));
+    var init = S.initialDistance || dist;
+    var progress = Math.max(0, Math.min(100, Math.round(((init - dist) / Math.max(1, init)) * 100)));
+    $('barTrackProgress').style.width = progress + '%';
+    $('txtProgressPercent').textContent = progress + '%';
+    if (S.tracking && dist <= S.radius) triggerArrivalAlarm(dist);
   }
 
-  function recalculateProximity() {
-    if (!S.user || !S.dest) return null;
-    var dist = haversine(S.user, S.dest);
-    var bear = bearing(S.user, S.dest);
-
-    $('destDirectDist').textContent = fmtDist(dist) + (currentLang === 'ar' ? ' خط مستقيم' : " à vol d'oiseau");
-    $('compassArrow').style.transform = 'rotate(' + Math.round(bear) + 'deg)';
-    $('panelArrow').style.transform = 'rotate(' + Math.round(bear) + 'deg)';
-    $('compassDist').textContent = fmtDistShort(dist);
-    $('statCap').textContent = fmtCompass(bear);
-    $('headingText').textContent = I18N[currentLang].heading + ' ' + fmtCompass(bear) + ' (' + Math.round(bear) + '°)';
-
-    if (S.tracking) {
-      $('liveDistance').textContent = fmtDist(dist);
-      var kmh = Math.round((S.speed || 0) * 3.6);
-      $('statSpeed').textContent = kmh;
-      
-      var etaSec = (S.speed && S.speed > 1) ? (dist / S.speed) : null;
-      $('statEta').textContent = fmtETA(etaSec);
-      $('statRadius').textContent = fmtDistShort(S.radius);
-      $('liveSub').textContent = dist <= S.radius ? I18N[currentLang].inAlertZone : ((currentLang === 'ar' ? 'الوصول المتوقع: ' : 'ETA : ') + fmtETA(etaSec));
-
-      var init = S.initialDistance || dist;
-      var pct = Math.max(0, Math.min(100, Math.round(((init - dist) / Math.max(1, init)) * 100)));
-      $('trackingProgress').style.width = pct + '%';
-      $('progressPct').textContent = pct + '%';
-      $('insideBadge').classList.toggle('hidden', !(dist <= S.radius));
-
-      if (dist <= S.radius && !S.alarmActive && !S.muted) {
-        triggerProximityAlarm(dist);
-      }
-    }
-    return dist;
+  // ===== HAMBURGER DRAWER =====
+  var navDrawer = $('navDrawer'), navScrim = $('navScrim'), navToggleBtn = $('navToggleBtn'), navCloseBtn = $('navCloseBtn');
+  var lastFocused = null;
+  function openNavDrawer() {
+    lastFocused = document.activeElement;
+    navDrawer.classList.add('open');
+    navScrim.classList.add('open');
+    navDrawer.setAttribute('aria-hidden', 'false');
+    navToggleBtn.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('nav-open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function () { navDrawer.focus(); }, 50);
   }
-
-  function updateStartButtonState() {
-    var hasDest = !!S.dest;
-    $('startBtn').disabled = !hasDest;
-    $('startHint').textContent = hasDest ? (currentLang === 'ar' ? 'جاهز لبدء التنبيه' : 'Prêt à démarrer le suivi') : I18N[currentLang].startHint;
+  function closeNavDrawer() {
+    navDrawer.classList.remove('open');
+    navScrim.classList.remove('open');
+    navDrawer.setAttribute('aria-hidden', 'true');
+    navToggleBtn.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('nav-open');
+    document.body.style.overflow = '';
+    if (lastFocused && lastFocused.focus) lastFocused.focus();
   }
-
-  /* =========================================================================
-     13. SPONSORED ADS (INTEGRATED & CLEAN)
-     ========================================================================= */
-  var AD_ITEMS = [
-    {
-      img: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=700&q=80',
-      brand: 'Rail Pass',
-      title: 'Voyages & Trains en promotion',
-      sub: 'Offres exclusives sur vos trajets quotidiens.'
-    },
-    {
-      img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=700&q=80',
-      brand: 'Audio Express',
-      title: 'Casques anti-bruit pour vos trajets',
-      sub: 'Voyagez dans le calme absolu.'
-    }
-  ];
-
-  var adIdx = 0, adSkipTimer = null;
-
-  function showInterstitialAd() {
-    var item = AD_ITEMS[adIdx % AD_ITEMS.length];
-    adIdx++;
-
-    $('adImg').src = item.img;
-    $('adBrand').textContent = item.brand;
-    $('adTitle').textContent = item.title;
-    $('adBody').textContent = item.sub;
-
-    var overlay = $('adOverlay');
-    var skipBtn = $('adSkipBtn');
-    var progress = $('adProgress');
-
-    overlay.classList.add('active');
-    skipBtn.disabled = true;
-    progress.style.transition = 'none';
-    progress.style.width = '0%';
-
-    var count = 4;
-    skipBtn.textContent = count + 's';
-    setTimeout(function () {
-      progress.style.transition = 'width 4s linear';
-      progress.style.width = '100%';
-    }, 50);
-
-    clearInterval(adSkipTimer);
-    adSkipTimer = setInterval(function () {
-      count--;
-      if (count <= 0) {
-        clearInterval(adSkipTimer);
-        skipBtn.disabled = false;
-        skipBtn.textContent = '✕ ' + (currentLang === 'ar' ? 'إغلاق' : 'Fermer');
-      } else {
-        skipBtn.textContent = count + 's';
-      }
-    }, 1000);
-  }
-
-  $('adSkipBtn').onclick = function () {
-    $('adOverlay').classList.remove('active');
-    clearInterval(adSkipTimer);
-  };
-  $('adCta').onclick = function () {
-    toast(currentLang === 'ar' ? 'فتح العرض الترويجي…' : 'Ouverture du partenaire…', 'info');
-    setTimeout(function () { $('adOverlay').classList.remove('active'); }, 500);
-  };
-
-  $('bannerClose').onclick = function () { $('bannerAd').classList.add('hidden'); };
-  $('bannerCta').onclick = function () { toast(currentLang === 'ar' ? 'استعراض العرض…' : 'Voir offre…', 'info'); };
-
-  /* =========================================================================
-     14. SEARCH & AUTOCOMPLETE (NOMINATIM / OSM)
-     ========================================================================= */
-  var searchTimeout = null;
-  $('searchInput').addEventListener('input', function (e) {
-    var q = e.target.value.trim();
-    $('searchClear').classList.toggle('hidden', !q);
-    $('searchClear').classList.toggle('flex', !!q);
-    clearTimeout(searchTimeout);
-
-    if (q.length < 3) {
-      $('searchResults').classList.add('hidden');
-      return;
-    }
-    searchTimeout = setTimeout(function () { performSearch(q); }, 450);
+  navToggleBtn.addEventListener('click', function () {
+    if (navDrawer.classList.contains('open')) closeNavDrawer(); else openNavDrawer();
+  });
+  navCloseBtn.addEventListener('click', closeNavDrawer);
+  navScrim.addEventListener('click', closeNavDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && navDrawer.classList.contains('open')) closeNavDrawer();
   });
 
-  function performSearch(query) {
-    $('searchSpinner').classList.remove('hidden');
-    fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query) + '&format=json&limit=5&accept-language=' + currentLang + '&addressdetails=1')
-      .then(function (r) { return r.json(); })
-      .then(function (results) {
-        var box = $('searchResults');
-        box.innerHTML = '';
-        if (!results || !results.length) {
-          box.innerHTML = '<div class="p-3 text-[12px] text-dim text-center">' + (currentLang === 'ar' ? 'لم يتم العثور على نتائج' : 'Aucun résultat') + '</div>';
-        } else {
-          results.forEach(function (res) {
-            var row = document.createElement('div');
-            row.className = 'p-3 border-b border-white/5 cursor-pointer flex items-center gap-2.5 transition hover:bg-white/10';
-            var title = res.display_name.split(',')[0];
-            row.innerHTML = '<div class="w-7 h-7 rounded-lg chip flex items-center justify-center text-[13px] shrink-0">📍</div>' +
-                            '<div class="flex-1 min-w-0">' +
-                            '<div class="text-[13px] font-bold truncate">' + title + '</div>' +
-                            '<div class="text-[10px] text-dim truncate">' + res.display_name + '</div>' +
-                            '</div>';
-            row.onclick = function () {
-              var pos = { lat: parseFloat(res.lat), lng: parseFloat(res.lon) };
-              setDestination(pos, true);
-              setNamedDestination(title, pos);
-              box.classList.add('hidden');
-              $('searchInput').value = '';
-              $('searchClear').classList.add('hidden');
-              if (map) map.flyTo([pos.lat, pos.lng], 15, { duration: 1.1 });
-              toast((currentLang === 'ar' ? 'الوجهة: ' : 'Destination : ') + title, 'success');
-              if (window.innerWidth < 768) collapseDrawer(true);
-            };
-            box.appendChild(row);
-          });
-        }
-        box.classList.remove('hidden');
-      })
-      .catch(function () {})
-      .finally(function () { $('searchSpinner').classList.add('hidden'); });
-  }
-
-  $('searchClear').onclick = function () {
-    $('searchInput').value = '';
-    $('searchResults').classList.add('hidden');
-    $('searchClear').classList.add('hidden');
-  };
-
-  document.addEventListener('click', function (e) {
-    if (!e.target.closest('#searchResults') && !e.target.closest('#searchInput')) {
-      $('searchResults').classList.add('hidden');
-    }
-    if (!e.target.closest('#mapStylePop') && !e.target.closest('#layersBtn') && !e.target.closest('#mapBadgeBtn')) {
-      $('mapStylePop').classList.add('hidden');
-    }
-    if (!e.target.closest('#langMenu') && !e.target.closest('#langBtn')) {
-      $('langMenu').classList.add('hidden');
-    }
-  });
-
-  /* =========================================================================
-     15. USER INTERFACE EVENT HANDLERS
-     ========================================================================= */
-  $('startBtn').onclick = startTracking;
-  $('stopBtn').onclick = function () {
-    stopTracking();
-    toast(currentLang === 'ar' ? 'تم إيقاف التتبع' : 'Suivi arrêté', 'info');
-    setTimeout(showInterstitialAd, 450);
-  };
-
-  $('muteBtn').onclick = function () {
-    S.muted = !S.muted;
-    $('muteBtn').textContent = S.muted ? I18N[currentLang].unmuteSound : I18N[currentLang].muteSound;
-    if (S.muted) stopSound();
-    toast(S.muted ? (currentLang === 'ar' ? 'تم كتم الصوت' : 'Son coupé') : (currentLang === 'ar' ? 'تم تشغيل الصوت' : 'Son activé'), 'info');
-  };
-
-  $('clearDestBtn').onclick = clearDestination;
-  $('centerDestBtn').onclick = function () {
-    if (map && S.dest) map.flyTo([S.dest.lat, S.dest.lng], 16, { duration: 1 });
-  };
-  $('locateBtn').onclick = function () { requestLocation(true); };
-  $('fitBtn').onclick = fitRouteBounds;
-  $('zoomIn').onclick = function () { if (map) map.zoomIn(); };
-  $('zoomOut').onclick = function () { if (map) map.zoomOut(); };
-
-  $('layersBtn').onclick = function () { $('mapStylePop').classList.toggle('hidden'); };
-  $('mapBadgeBtn').onclick = function () { $('mapStylePop').classList.toggle('hidden'); };
-  $('mapPopClose').onclick = function () { $('mapStylePop').classList.add('hidden'); };
-
-  // Radius slider handlers
-  function changeRadius(val) {
-    S.radius = +val;
-    $('radiusSlider').value = val;
-    $('radiusSliderLive').value = val;
-    $('radiusBig').textContent = fmtDist(val);
-    $('radiusExplain').textContent = fmtDist(val) + (currentLang === 'ar' ? ' قبل المحطة' : ' avant votre arrêt');
-    $('progressTarget').textContent = (currentLang === 'ar' ? 'تنبيه عند ' : 'ALERTE À ') + fmtDistShort(val);
-    $('statRadius').textContent = fmtDistShort(val);
-
-    document.querySelectorAll('.radius-pill').forEach(function (pill) {
-      pill.classList.toggle('active', +pill.dataset.radius === +val);
+  // Accordions
+  document.querySelectorAll('.nav-accordion-head').forEach(function (head) {
+    head.addEventListener('click', function () {
+      var parent = head.closest('.nav-accordion');
+      var isOpen = parent.classList.contains('open');
+      parent.classList.toggle('open');
+      head.setAttribute('aria-expanded', !isOpen);
     });
-
-    if (radiusCircle) radiusCircle.setRadius(S.radius);
-    recalculateProximity();
-  }
-
-  $('radiusSlider').addEventListener('input', function (e) { changeRadius(e.target.value); });
-  $('radiusSliderLive').addEventListener('input', function (e) { changeRadius(e.target.value); });
-  document.querySelectorAll('.radius-pill').forEach(function (btn) {
-    btn.onclick = function () { changeRadius(btn.dataset.radius); };
   });
 
-  // Alarm types
-  document.querySelectorAll('.alarm-type').forEach(function (btn) {
+  // ===== EVENT LISTENERS =====
+  $('langBtnAr').onclick = function () { applyLanguage('ar'); };
+  $('langBtnFr').onclick = function () { applyLanguage('fr'); };
+  $('langBtnEn').onclick = function () { applyLanguage('en'); };
+
+  $('btnRemoveDest').onclick = clearDestination;
+  $('btnStartTrip').onclick = startTripTracking;
+  $('btnStopTrip').onclick = stopTripTracking;
+  $('btnRecenterDest').onclick = function () { if (map && S.dest) map.flyTo([S.dest.lat, S.dest.lng], 16, { duration:1 }); };
+  $('locateMeBtn').onclick = function () { startGPS(); if (map && S.user) map.flyTo([S.user.lat, S.user.lng], 15, { duration:1 }); };
+  $('fitRouteBtn').onclick = function () { if (map && S.user && S.dest) map.fitBounds(L.latLngBounds([[S.user.lat, S.user.lng],[S.dest.lat, S.dest.lng]]), { padding:[70,70], maxZoom:16 }); };
+  $('zoomInBtn').onclick = function () { if (map) map.zoomIn(); };
+  $('zoomOutBtn').onclick = function () { if (map) map.zoomOut(); };
+  $('mapLayersMenuBtn').onclick = function () { $('mapStylePop').classList.toggle('hidden'); renderMapLayersList(); };
+  $('mapTypeToggleBtn').onclick = function () { $('mapStylePop').classList.toggle('hidden'); renderMapLayersList(); };
+  $('closeMapPopBtn').onclick = function () { $('mapStylePop').classList.add('hidden'); };
+
+  function updateRadius(val) {
+    S.radius = parseInt(val, 10);
+    $('sliderRadius').value = S.radius;
+    $('displayRadiusValue').textContent = fmtDist(S.radius);
+    $('radExplMeters').textContent = fmtDist(S.radius);
+    $('txtAlertThreshold').textContent = I18N[currentLang].alertAt.replace('{m}', fmtDist(S.radius));
+    document.querySelectorAll('.radius-btn').forEach(function (btn) { btn.classList.toggle('active', parseInt(btn.getAttribute('data-rad'), 10) === S.radius); });
+    if (radiusCircle && S.dest) radiusCircle.setRadius(S.radius);
+  }
+  $('sliderRadius').addEventListener('input', function (e) { updateRadius(e.target.value); });
+  document.querySelectorAll('.radius-btn').forEach(function (btn) { btn.onclick = function () { updateRadius(btn.getAttribute('data-rad')); }; });
+
+  document.querySelectorAll('.tone-btn').forEach(function (btn) {
     btn.onclick = function () {
-      document.querySelectorAll('.alarm-type').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tone-btn').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
-      S.alarmType = btn.dataset.alarm;
+      S.alarmType = btn.getAttribute('data-tone');
     };
   });
 
-  // Vibration toggle
-  $('vibToggle').onclick = function () {
-    S.vibration = !S.vibration;
-    $('vibToggle').classList.toggle('on', S.vibration);
-    $('vibToggle').setAttribute('aria-checked', S.vibration ? 'true' : 'false');
+  $('btnTestAudio').onclick = function () {
+    if (!isTestingSound) {
+      isTestingSound = true;
+      $('iconTestAudio').textContent = '■';
+      $('txtTestAudio').textContent = I18N[currentLang].stopTone;
+      startAlarmSound();
+      setTimeout(function () { if (isTestingSound) { stopAlarmSound(); isTestingSound = false; $('iconTestAudio').textContent = '▶'; $('txtTestAudio').textContent = I18N[currentLang].testTone; } }, 3500);
+    } else { stopAlarmSound(); isTestingSound = false; $('iconTestAudio').textContent = '▶'; $('txtTestAudio').textContent = I18N[currentLang].testTone; }
   };
 
-  // Example destination (Central Station preset)
-  $('demoDestBtn').onclick = function () {
-    var demoPt = { lat: 24.7136, lng: 46.6753 };
-    var name = currentLang === 'ar' ? 'المحطة المركزية' : (currentLang === 'fr' ? 'Gare Centrale' : 'Central Station');
-    setDestination(demoPt, true);
-    setNamedDestination(name, demoPt);
-    if (map) map.flyTo([demoPt.lat, demoPt.lng], 15, { duration: 1 });
-    if (window.innerWidth < 768) collapseDrawer(true);
-  };
-
-  // Favorites Modal Handlers
-  $('openFavsBtn').onclick = function () {
-    if (S.dest && S.destName) $('favCustomName').value = S.destName;
-    $('favModal').classList.add('open');
-    renderFavorites();
-  };
-  $('manageFavsBtn').onclick = function () {
-    $('favModal').classList.add('open');
-    renderFavorites();
-  };
-  $('favCloseBtn').onclick = function () { $('favModal').classList.remove('open'); };
-  $('favModal').onclick = function (e) { if (e.target === $('favModal')) $('favModal').classList.remove('open'); };
-
-  $('saveFavBtn').onclick = function () {
-    if (!S.dest) {
-      toast(currentLang === 'ar' ? 'حدد وجهة على الخريطة أولاً 📍' : 'Posez un point sur la carte 📍', 'warn');
-      return;
-    }
-    $('favCustomName').value = S.destName || '';
-    $('favModal').classList.add('open');
-    setTimeout(function () { $('favCustomName').focus(); }, 120);
-  };
-
-  $('favSaveConfirmBtn').onclick = function () {
-    saveFavoriteWithName($('favCustomName').value);
-    $('favModal').classList.remove('open');
-  };
-  $('favCustomName').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      saveFavoriteWithName($('favCustomName').value);
-      $('favModal').classList.remove('open');
-    }
-  });
-
-  document.querySelectorAll('.name-sugg').forEach(function (chip) {
-    chip.onclick = function () {
-      $('favCustomName').value = chip.dataset.name || chip.textContent.trim();
-      $('favCustomName').focus();
-    };
-  });
-
-  // Language Menu
-  $('langBtn').onclick = function () { $('langMenu').classList.toggle('hidden'); };
-  document.querySelectorAll('.lang-opt').forEach(function (b) {
-    b.onclick = function () {
-      setLanguage(b.dataset.lang);
-      $('langMenu').classList.add('hidden');
-      toast(b.textContent + ' ✅', 'info');
-    };
-  });
-
-  // Drawer collapse/expand
-  function collapseDrawer(state) {
-    S.sheetCollapsed = state;
-    $('bottomSheet').classList.toggle('collapsed', state);
-    $('sheetHint').textContent = state ? I18N[currentLang].sheetHintOpen : I18N[currentLang].sheetHintClose;
-    setTimeout(function () { if (map) map.invalidateSize(); }, 400);
+  // Vibration toggle (drawer)
+  function syncVibToggle() {
+    var t = $('toggleVibration');
+    t.classList.toggle('on', S.vibration);
+    t.classList.toggle('off', !S.vibration);
+    t.setAttribute('aria-checked', S.vibration);
   }
-  $('sheetHandle').onclick = function () {
-    if (window.innerWidth < 768) collapseDrawer(!S.sheetCollapsed);
+  $('toggleVibration').onclick = function () { S.vibration = !S.vibration; syncVibToggle(); try { localStorage.setItem('arriva_vib', S.vibration ? '1' : '0'); } catch(e){} };
+  $('toggleVibration').onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('toggleVibration').click(); } };
+
+  // Theme toggle (drawer)
+  function syncThemeToggle() {
+    var t = $('themeToggleBtn');
+    t.classList.toggle('on', S.theme === 'dark');
+    t.classList.toggle('off', S.theme !== 'dark');
+    t.setAttribute('aria-checked', S.theme === 'dark');
+  }
+  function applyTheme(theme) {
+    S.theme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    syncThemeToggle();
+    try { localStorage.setItem('arriva_theme', theme); } catch(e){}
+  }
+  $('themeToggleBtn').onclick = function () { applyTheme(S.theme === 'dark' ? 'light' : 'dark'); };
+  $('themeToggleBtn').onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('themeToggleBtn').click(); } };
+
+  $('btnMuteSound').onclick = function () { S.muted = !S.muted; $('txtMuteBtn').textContent = S.muted ? I18N[currentLang].unmuteSound : I18N[currentLang].muteSound; if (S.muted) stopAlarmSound(); };
+  $('btnAlarmTurnOff').onclick = function () { dismissAlarm(true); };
+  $('btnAlarmMuteOnly').onclick = function () { dismissAlarm(false); };
+
+  // Favorites (drawer)
+  $('btnOpenSaveFav').onclick = function () { if (S.dest && S.destName) $('inputFavCustomName').value = S.destName; openNavDrawer(); var acc = document.querySelector('[data-section="fav"]'); acc.classList.add('open'); acc.querySelector('.nav-accordion-head').setAttribute('aria-expanded','true'); };
+  $('btnManageAllFavs').onclick = function () { openNavDrawer(); var acc = document.querySelector('[data-section="fav"]'); acc.classList.add('open'); acc.querySelector('.nav-accordion-head').setAttribute('aria-expanded','true'); };
+  $('btnSaveFavoriteSubmit').onclick = function () { saveFavoritePlace($('inputFavCustomName').value); };
+  document.querySelectorAll('.fav-quick-tag').forEach(function (tag) { tag.onclick = function () { $('inputFavCustomName').value = tag.textContent.replace(/^[^\w\u0600-\u06FF]+/, '').trim(); }; });
+
+  // Ads
+  $('adBannerAction').onclick = function () { toast(I18N[currentLang].adPartner + ' ⭐', 'info'); };
+  $('btnTrackAdClick').onclick = function () { toast(I18N[currentLang].adPartner + ' ⭐', 'info'); };
+
+  // Sheet
+  function collapseSheet(state) { S.sheetCollapsed = state; $('bottomSheet').classList.toggle('collapsed', state); setTimeout(function () { if (map) map.invalidateSize(); }, 400); }
+  $('sheetHandleBtn').onclick = function () { if (isMobile()) collapseSheet(!S.sheetCollapsed); };
+
+  // ===== PWA INSTALL =====
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; var b = $('btnInstallPwa'); if (b) b.classList.remove('hidden'); });
+  $('btnInstallPwa').onclick = function () {
+    if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(function () { deferredPrompt = null; $('btnInstallPwa').classList.add('hidden'); }); }
+    else toast(currentLang === 'ar' ? 'استخدم قائمة المتصفح "إضافة إلى الشاشة الرئيسية"' : 'Use browser menu "Add to Home Screen"', 'info');
   };
 
-  // Theme Toggle
-  $('themeBtn').onclick = function () {
-    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    var next = isDark ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    $('iconMoon').classList.toggle('hidden', !isDark);
-    $('iconSun').classList.toggle('hidden', isDark);
-    try { localStorage.setItem('arriva_theme', next); } catch (e) {}
-  };
-
-  /* =========================================================================
-     16. APP INITIALIZATION
-     ========================================================================= */
-  (function initApp() {
-    var savedTheme = null;
-    try { savedTheme = localStorage.getItem('arriva_theme'); } catch (e) {}
-    if (savedTheme === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-      $('iconMoon').classList.add('hidden');
-      $('iconSun').classList.remove('hidden');
-    }
-
-    setLanguage(currentLang);
-    initMap();
-    renderMapOptions();
-    renderFavorites();
-    updateStartButtonState();
-    requestLocation(false);
-
-    if (window.innerWidth < 768) {
-      setTimeout(function () { collapseDrawer(true); }, 2200);
+  // ===== INIT =====
+  (function init() {
+    applyTheme(S.theme);
+    initGoogleMap();
+    applyLanguage(currentLang);
+    syncVibToggle(); syncThemeToggle();
+    try { if (localStorage.getItem('arriva_vib') === '0') { S.vibration = false; syncVibToggle(); } } catch(e){}
+    startGPS();
+    var defaultStop = S.favorites[0] || { lat:48.8448, lng:2.3735, name:'Paris Gare de Lyon' };
+    setDestination(defaultStop, defaultStop.name);
+    // register service worker for PWA (no-op in sandboxed iframe)
+    if ('serviceWorker' in navigator) {
+      try {
+        var swCode = 'self.addEventListener("install",function(e){self.skipWaiting();});self.addEventListener("activate",function(e){e.waitUntil(self.clients.claim());});self.addEventListener("fetch",function(){});';
+        var blob = new Blob([swCode], { type:'application/javascript' });
+        var swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(function(){});
+      } catch(e){}
     }
   })();
-
 })();
 </script>
 </body>
